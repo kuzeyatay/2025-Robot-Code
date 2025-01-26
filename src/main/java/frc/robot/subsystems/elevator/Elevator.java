@@ -1,6 +1,5 @@
 package frc.robot.subsystems.elevator;
 
-import static edu.wpi.first.units.Units.*;
 import static frc.robot.subsystems.elevator.ElevatorConstants.gains;
 
 import edu.wpi.first.math.MathUtil;
@@ -76,10 +75,17 @@ public class Elevator extends SubsystemBase {
    * height supplier.
    */
   @RequiredArgsConstructor
+  // FIXME
   public enum Goal {
-    STOW(() -> 0),
-    HIGH(new LoggedTunableNumber("Elevator/HIGH", 1)),
-    MID(new LoggedTunableNumber("Elevator/MID", 0.5));
+    STOW(new LoggedTunableNumber("Elevator/STOW", 0.0)),
+    L1(new LoggedTunableNumber("Elevator/L1", 0.0)),
+    L2(new LoggedTunableNumber("Elevator/L2", 0.0)),
+    L3(new LoggedTunableNumber("Elevator/L3", 0.0)),
+    L4(new LoggedTunableNumber("Elevator/L4", 0.0)),
+    PROCESSOR(new LoggedTunableNumber("Elevator/PROCESSOR", 0.0)),
+    NET(new LoggedTunableNumber("Elevator/NET", 0.0)),
+    EJECT(new LoggedTunableNumber("Elevator/EJECT", 0.0)),
+    CA(new LoggedTunableNumber("Elevator/Coral on top of alge", 0.0));
 
     // Supplier that provides the setpoint height for the goal
     private final DoubleSupplier elevatorSetpointSupplier;

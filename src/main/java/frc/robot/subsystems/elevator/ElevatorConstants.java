@@ -42,33 +42,31 @@ public class ElevatorConstants {
   // Defines the gearing factor for the elevator mechanism
   public static final double kElevatorGearing = 10.0;
 
-  // Defines the radius of the drum driving the elevator, converted from inches to meters; FIXME
-  // indicates it needs to
-  // be set correctly
-  public static final double kElevatorDrumRadius =
-      Units.inchesToMeters(2.0); // FIXME the radius of the sprocket driving the elevator
+  // Defines the radius of the drum driving the elevator, converted from inches to meters
+  public static final double kElevatorDrumRadius = Units.inchesToMeters(1.41 / 2.0);
 
-  // Defines the mass of the elevator carriage in kilograms
-  public static final double kCarriageMass = 4.0; // kg
+  // FIXME Defines the mass of the elevator carriage in kilograms
+  public static final double kCarriageMass = 17.5; // kg
 
   // Comment explaining that the encoder is zeroed at the bottom position, setting the minimum
   // height
   // Encoder is reset to measure 0 at the bottom, so minimum height is 0.
-  public static final double kMinElevatorHeightMeters = 0.1;
+  public static final double kMinElevatorHeightMeters = 0.05;
 
-  // Defines the maximum height the elevator can reach in meters
-  public static final double kMaxElevatorHeightMeters = 1.25;
+  // FIXME Defines the maximum height the elevator can reach in meters
+  public static final double kMaxElevatorHeightMeters = 2.20;
 
   // Defines the motion constraints for the elevator's trapezoidal motion profile with max velocity
   // and acceleration
   public static final TrapezoidProfile.Constraints elevatorMotionConstraint =
       new TrapezoidProfile.Constraints(2.0, 2.0);
 
-  // Defines the gains for the elevator based on the current mode using a switch expression
+  // FIXME TEST Defines the gains for the elevator based on the current mode using a switch
+  // expression
   public static final Gains gains =
       switch (ModeSetter.currentMode) {
         case SIM -> new Gains(75, 0.0, 0.0, 2.0, 0.0, 0.0, 0.0);
-        case REAL, REPLAY -> new Gains(10.0, 0.0, 2.5, 0.0, 0.0, 0.0, 0.0);
+        case REAL, REPLAY -> new Gains(10.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0);
       };
 
   // Defines a record to hold the PID and feedforward gains for the elevator
