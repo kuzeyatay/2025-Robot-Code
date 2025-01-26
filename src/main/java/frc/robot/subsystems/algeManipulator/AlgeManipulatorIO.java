@@ -15,8 +15,6 @@ public interface AlgeManipulatorIO {
 
     // Current position of the arm in radians from the primary encoder
     public double positionRads = 0.0;
-    // Absolute encoder position in radians
-    public double absoluteEncoderPositionRads = 0.0;
     // Relative encoder position in radians
     public double relativeEncoderPositionRads = 0.0;
     // Current velocity of the arm in radians per second
@@ -29,8 +27,6 @@ public interface AlgeManipulatorIO {
     public double[] torqueCurrentAmps = new double[] {};
     // Array of temperatures in Celsius for the motors
     public double[] tempCelcius = new double[] {};
-    // Indicates if the absolute encoder is connected
-    public boolean absoluteEncoderConnected = true;
   }
 
   // Default method to update the ArmIOInputs; to be implemented by concrete classes

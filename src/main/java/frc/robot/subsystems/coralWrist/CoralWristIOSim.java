@@ -1,4 +1,4 @@
-package frc.robot.subsystems.arm;
+package frc.robot.subsystems.coralWrist;
 
 import edu.wpi.first.math.MathUtil;
 import edu.wpi.first.math.controller.PIDController;
@@ -8,7 +8,7 @@ import edu.wpi.first.wpilibj.DriverStation;
 import edu.wpi.first.wpilibj.simulation.SingleJointedArmSim;
 
 // Define the ArmIOSim class, which implements the ArmIO interface for simulation purposes
-public class ArmIOSim implements ArmIO {
+public class CoralWristIOSim implements CoralWristIO {
   // Define a constant for the automatic start angle, converted from degrees to radians
   private static final double autoStartAngle = Units.degreesToRadians(80.0);
 
@@ -23,11 +23,11 @@ public class ArmIOSim implements ArmIO {
   private final SingleJointedArmSim sim =
       new SingleJointedArmSim(
           DCMotor.getKrakenX60Foc(1),
-          ArmConstants.kArmGearRatio,
+          CoralWristConstants.kArmGearRatio,
           1.06328,
-          ArmConstants.armLength,
-          ArmConstants.minAngle,
-          ArmConstants.maxAngle,
+          CoralWristConstants.armLength,
+          CoralWristConstants.minAngle,
+          CoralWristConstants.maxAngle,
           false,
           Units.degreesToRadians(0.0));
 
@@ -46,7 +46,7 @@ public class ArmIOSim implements ArmIO {
   private boolean wasNotAuto = true;
 
   // Constructor for the ArmIOSim class
-  public ArmIOSim() {
+  public CoralWristIOSim() {
     // Instantiate the PIDController with initial P, I, D gains set to 0.0
     controller = new PIDController(0.0, 0.0, 0.0);
     // Set the initial state of the simulated arm to position 0.0 radians and velocity 0.0 rad/s
@@ -57,7 +57,7 @@ public class ArmIOSim implements ArmIO {
 
   // Override the updateInputs method from the ArmIO interface to update sensor inputs
   @Override
-  public void updateInputs(ArmIOInputs inputs) {
+  public void updateInputs(CoralWristIOInputs inputs) {
     // If the robot is disabled, mark that the controller needs to be reset
     if (DriverStation.isDisabled()) {
       controllerNeedsReset = true;

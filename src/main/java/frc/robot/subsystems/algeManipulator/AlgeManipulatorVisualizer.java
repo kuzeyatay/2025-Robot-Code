@@ -47,6 +47,6 @@ public class AlgeManipulatorVisualizer {
     // Set the angle of the arm ligament based on the provided angle in radians
     arm.setAngle(Rotation2d.fromRadians(angleRads));
     // Record the current state of the mechanism for visualization purposes
-    Logger.recordOutput("Arm/Mechanism2d/" + key, mechanism); // FIXME
+    Logger.recordOutput("Alge Manipulator/Mechanism2d/" + key, mechanism);
   }
 }

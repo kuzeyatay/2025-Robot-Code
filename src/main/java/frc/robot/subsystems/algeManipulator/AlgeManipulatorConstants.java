@@ -11,7 +11,7 @@ public final class AlgeManipulatorConstants {
   // Define the minimum angle for the arm in degrees
   public static final double minAngle = 0.0;
   // Define the maximum angle for the arm in degrees
-  public static final double maxAngle = 270;
+  public static final double maxAngle = 135;
 
   // Convert the minimum angle to radians for soft limit reverse
   public static final double kSoftLimitReverse = Units.degreesToRadians(minAngle);
@@ -23,7 +23,7 @@ public final class AlgeManipulatorConstants {
   public static final Translation2d armOrigin = new Translation2d(0, 0); // FIXME ????
 
   // Calculate the gear ratio for the arm based on multiple gear stages
-  public static final double kArmGearRatio = (62.0 / 12.0) * (60.0 / 18.0) * (65.0 / 12.0);
+  public static final double kArmGearRatio = (42.0 / 12.0);
 
   // Define the CAN ID for the leader motor controller
   public static final int leaderID = 13;
@@ -36,8 +36,9 @@ public final class AlgeManipulatorConstants {
   // Define the cosine offset to apply to the arm's zero position in radians
   // This adjusts the converted arm position to match the real-world arm position
   public static final double kArmZeroCosineOffset =
-      0.0; // radians to add to converted arm position to get real-world arm position (starts at ~x
-  // deg angle)
+      0.0; //  FIXME radians to add to converted arm position to get real-world arm position (starts
+  // at ~x
+  // deg angle if using abs encoder)
 
   // Define the motion constraints for the arm using trapezoidal profiling (max velocity and
   // acceleration)
@@ -53,7 +54,7 @@ public final class AlgeManipulatorConstants {
           // In simulation mode, use higher kP and set other gains accordingly
         case SIM -> new Gains(100, 0.0, 0.0, 2.0, 0.0, 0.0, 0.0);
           // In real or replay modes, use different gains for actual hardware
-        case REAL, REPLAY -> new Gains(75.0, 0.0, 2.5, 0.0, 0.0, 0.0, 0.0);
+        case REAL, REPLAY -> new Gains(75.0, 0.0, 0, 0.0, 0.0, 0.0, 0.0);
       };
 
   // Define a record to hold the PID and feedforward gains

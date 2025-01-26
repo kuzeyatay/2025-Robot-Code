@@ -1,4 +1,4 @@
-package frc.robot.subsystems.arm;
+package frc.robot.subsystems.coralWrist;
 
 import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.wpilibj.util.Color;
@@ -9,7 +9,7 @@ import org.littletonrobotics.junction.mechanism.LoggedMechanismLigament2d;
 import org.littletonrobotics.junction.mechanism.LoggedMechanismRoot2d;
 
 // Define the ArmVisualizer class, responsible for visualizing the robot arm's movement
-public class ArmVisualizer {
+public class CoralWristVisualizer {
   // Declare a LoggedMechanism2d object to represent the entire mechanism in 2D
   private final LoggedMechanism2d mechanism;
   // Declare a LoggedMechanismLigament2d object to represent the arm's ligament (the moving part)
@@ -18,7 +18,7 @@ public class ArmVisualizer {
   private final String key;
 
   // Constructor for the ArmVisualizer class, taking a key and a color as parameters
-  public ArmVisualizer(String key, Color color) {
+  public CoralWristVisualizer(String key, Color color) {
     // Assign the provided key to the class's key variable
     this.key = key;
     // Initialize the LoggedMechanism2d with width 3.0, height 3.0, and a white color
@@ -32,7 +32,8 @@ public class ArmVisualizer {
     // - Number of points: 6
     // - Color: The provided color converted to 8-bit
     arm =
-        new LoggedMechanismLigament2d("arm", ArmConstants.armLength, 20.0, 6, new Color8Bit(color));
+        new LoggedMechanismLigament2d(
+            "arm", CoralWristConstants.armLength, 20.0, 6, new Color8Bit(color));
     // Attach the arm ligament to the root of the mechanism
     root.append(arm);
   }
@@ -46,6 +47,6 @@ public class ArmVisualizer {
     // Set the angle of the arm ligament based on the provided angle in radians
     arm.setAngle(Rotation2d.fromRadians(angleRads));
     // Record the current state of the mechanism for visualization purposes
-    Logger.recordOutput("Arm/Mechanism2d/" + key, mechanism); // FIXME
+    Logger.recordOutput("CoralWrist/Mechanism2d/" + key, mechanism); // FIXME
   }
 }

@@ -1,4 +1,4 @@
-package frc.robot.subsystems.arm;
+package frc.robot.subsystems.coralWrist;
 
 import static edu.wpi.first.units.Units.RotationsPerSecond;
 
@@ -7,7 +7,6 @@ import com.ctre.phoenix6.StatusSignal;
 import com.ctre.phoenix6.configs.CANcoderConfiguration;
 import com.ctre.phoenix6.configs.TalonFXConfiguration;
 import com.ctre.phoenix6.controls.*;
-import com.ctre.phoenix6.hardware.CANcoder;
 import com.ctre.phoenix6.hardware.TalonFX;
 import com.ctre.phoenix6.signals.*;
 import edu.wpi.first.math.util.Units;
@@ -19,25 +18,19 @@ import edu.wpi.first.units.measure.Voltage;
 import java.util.List;
 
 // Define the ArmIOKrakenFOC class, which implements the ArmIO interface
-public class ArmIOKrakenFOC implements ArmIO {
+public class CoralWristIOKrakenFOC implements CoralWristIO {
   // Hardware Components
 
   // Define the leader TalonFX motor controller with the leaderID from ArmConstants and connected to
   // the "rio" CAN bus
   private final TalonFX leaderTalon;
-  // Define the absolute CANcoder encoder with the armEncoderID from ArmConstants and connected to
-  // the "rio" CAN bus
-  private final CANcoder absoluteEncoder;
 
   // Status Signals
 
   // Status signal for the internal position of the arm in rotations, retrieved from the leader
   // TalonFX
   private final StatusSignal<Angle> internalPositionRotations;
-  // Status signal for the absolute encoder position in rotations from the CANcoder
-  private final StatusSignal<Angle> encoderAbsolutePositionRotations;
-  // Status signal for the relative encoder position in rotations from the CANcoder
-  private final StatusSignal<Angle> encoderRelativePositionRotations;
+
   // Status signal for the arm's velocity in rotations per second from the leader TalonFX
   private final StatusSignal<AngularVelocity> velocityRps;
   // List of status signals for the voltages applied to the motors
@@ -66,12 +59,9 @@ public class ArmIOKrakenFOC implements ArmIO {
   private final TalonFXConfiguration config = new TalonFXConfiguration();
 
   // Constructor for the ArmIOKrakenFOC class
-  public ArmIOKrakenFOC() {
+  public CoralWristIOKrakenFOC() {
     // Initialize the leader TalonFX motor controller with the specified CAN ID and CAN bus
-    leaderTalon = new TalonFX(ArmConstants.leaderID, "rio");
-
-    // Initialize the absolute CANcoder encoder with the specified CAN ID and CAN bus
-    absoluteEncoder = new CANcoder(ArmConstants.armEncoderID, "rio");
+    leaderTalon = new TalonFX(CoralWristConstants.leaderID, "rio");
 
     // Configure the absolute encoder settings
     CANcoderConfiguration armEncoderConfig = new CANcoderConfiguration();
@@ -79,9 +69,7 @@ public class ArmIOKrakenFOC implements ArmIO {
     armEncoderConfig.MagnetSensor.SensorDirection = SensorDirectionValue.Clockwise_Positive;
     // Set the magnet offset by converting the arm's zero cosine offset from radians to rotations
     armEncoderConfig.MagnetSensor.MagnetOffset =
-        Units.radiansToRotations(ArmConstants.kArmZeroCosineOffset);
-    // Apply the configuration to the absolute encoder with a timeout of 1.0 seconds
-    absoluteEncoder.getConfigurator().apply(armEncoderConfig, 1.0);
+        Units.radiansToRotations(CoralWristConstants.kArmZeroCosineOffset);
 
     // Configure the leader TalonFX motor controller settings
 
@@ -92,11 +80,11 @@ public class ArmIOKrakenFOC implements ArmIO {
     // Set the acceleration gain (kA) to 0.01 volts per rotation per second squared
     config.Slot0.kA = 0.01; // An acceleration of 1 rps/s requires 0.01 V output
     // Set the proportional gain (kP) from ArmConstants
-    config.Slot0.kP = ArmConstants.gains.kP();
+    config.Slot0.kP = CoralWristConstants.gains.kP();
     // Set the integral gain (kI) from ArmConstants
-    config.Slot0.kI = ArmConstants.gains.kI();
+    config.Slot0.kI = CoralWristConstants.gains.kI();
     // Set the derivative gain (kD) from ArmConstants
-    config.Slot0.kD = ArmConstants.gains.kD();
+    config.Slot0.kD = CoralWristConstants.gains.kD();
     // Set the peak forward torque current to 80.0 amps
     config.TorqueCurrent.PeakForwardTorqueCurrent = 80.0;
     // Set the peak reverse torque current to -80.0 amps
@@ -104,17 +92,17 @@ public class ArmIOKrakenFOC implements ArmIO {
 
     // Configure motor output settings based on inversion from ArmConstants
     config.MotorOutput.Inverted =
-        ArmConstants.leaderInverted
+        CoralWristConstants.leaderInverted
             ? InvertedValue.Clockwise_Positive
             : InvertedValue.CounterClockwise_Positive;
     // Set the neutral mode to brake
     config.MotorOutput.NeutralMode = NeutralModeValue.Brake;
     // Set the remote sensor ID to the arm encoder's CAN ID
-    config.Feedback.FeedbackRemoteSensorID = ArmConstants.armEncoderID;
+    config.Feedback.FeedbackRemoteSensorID = CoralWristConstants.armEncoderID;
     // Set the feedback sensor source to the fused CANcoder
     config.Feedback.FeedbackSensorSource = FeedbackSensorSourceValue.FusedCANcoder;
     // Set the rotor to sensor gear ratio from ArmConstants
-    config.Feedback.RotorToSensorRatio = ArmConstants.kArmGearRatio;
+    config.Feedback.RotorToSensorRatio = CoralWristConstants.kArmGearRatio;
     // Set the sensor to mechanism gear ratio to 1.0 (no additional gearing)
     config.Feedback.SensorToMechanismRatio = 1.0;
     // Apply the TalonFX configuration to the leader Talon with a timeout of 1.0 seconds
@@ -137,10 +125,7 @@ public class ArmIOKrakenFOC implements ArmIO {
 
     // Get the internal position from the leader TalonFX
     internalPositionRotations = leaderTalon.getPosition();
-    // Get the absolute encoder position from the CANcoder
-    encoderAbsolutePositionRotations = absoluteEncoder.getAbsolutePosition();
-    // Get the relative encoder position from the CANcoder
-    encoderRelativePositionRotations = absoluteEncoder.getPosition();
+
     // Get the velocity in rotations per second from the leader TalonFX
     velocityRps = leaderTalon.getVelocity();
     // Get the applied voltages to the motors from the leader TalonFX
@@ -171,16 +156,14 @@ public class ArmIOKrakenFOC implements ArmIO {
         tempCelsius.get(1));
 
     // Set the update frequency for absolute and relative encoder positions to 500 Hz
-    BaseStatusSignal.setUpdateFrequencyForAll(
-        500, encoderAbsolutePositionRotations, encoderRelativePositionRotations);
+    BaseStatusSignal.setUpdateFrequencyForAll(500, internalPositionRotations);
 
     // Optimize CAN bus utilization by scheduling message updates efficiently
     leaderTalon.optimizeBusUtilization(0, 1.0);
-    absoluteEncoder.optimizeBusUtilization(0, 1.0);
   }
 
   // Method to update the inputs for the ArmIO interface
-  public void updateInputs(ArmIOInputs inputs) {
+  public void updateInputs(CoralWristIOInputs inputs) {
     // Refresh and check if the leader motor's signals are OK (connected and responsive)
     inputs.leaderMotorConnected =
         BaseStatusSignal.refreshAll(
@@ -200,21 +183,11 @@ public class ArmIOKrakenFOC implements ArmIO {
                 tempCelsius.get(1))
             .isOK();
     // Refresh and check if the absolute encoder's signals are OK (connected and responsive)
-    inputs.absoluteEncoderConnected =
-        BaseStatusSignal.refreshAll(
-                encoderAbsolutePositionRotations, encoderRelativePositionRotations)
-            .isOK();
+    inputs.absoluteEncoderConnected = BaseStatusSignal.refreshAll(internalPositionRotations).isOK();
 
     // Update the arm's position in radians by converting internal rotations to radians
     inputs.positionRads = Units.rotationsToRadians(internalPositionRotations.getValueAsDouble());
-    // Update the absolute encoder's position in radians, adjusting for the zero cosine offset
-    inputs.absoluteEncoderPositionRads =
-        Units.rotationsToRadians(encoderAbsolutePositionRotations.getValueAsDouble())
-            - Units.degreesToRadians(ArmConstants.kArmZeroCosineOffset); // Negate internal offset
-    // Update the relative encoder's position in radians, adjusting for the zero cosine offset
-    inputs.relativeEncoderPositionRads =
-        Units.rotationsToRadians(encoderRelativePositionRotations.getValueAsDouble())
-            - Units.degreesToRadians(ArmConstants.kArmZeroCosineOffset);
+
     // Update the arm's velocity in radians per second by converting rotations per second to radians
     // per second
     inputs.velocityRadsPerSec =

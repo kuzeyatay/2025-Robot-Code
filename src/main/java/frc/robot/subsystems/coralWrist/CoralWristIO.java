@@ -1,13 +1,13 @@
-package frc.robot.subsystems.arm;
+package frc.robot.subsystems.coralWrist;
 
 import org.littletonrobotics.junction.AutoLog;
 
 // Define the ArmIO interface for input/output operations related to the arm subsystem
-public interface ArmIO {
+public interface CoralWristIO {
 
   // Define a nested class to hold inputs for the ArmIO, with auto-logging capability
   @AutoLog
-  class ArmIOInputs {
+  class CoralWristIOInputs {
     // Indicates if the leader motor is connected
     public boolean leaderMotorConnected = true;
     // Indicates if the follower motor is connected
@@ -34,7 +34,7 @@ public interface ArmIO {
   }
 
   // Default method to update the ArmIOInputs; to be implemented by concrete classes
-  default void updateInputs(ArmIOInputs inputs) {}
+  default void updateInputs(CoralWristIOInputs inputs) {}
 
   /**
    * Default method to run the arm to a specified setpoint angle in radians with a feedforward

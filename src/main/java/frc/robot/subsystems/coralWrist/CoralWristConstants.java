@@ -1,4 +1,4 @@
-package frc.robot.subsystems.arm;
+package frc.robot.subsystems.coralWrist;
 
 import edu.wpi.first.math.geometry.Translation2d;
 import edu.wpi.first.math.trajectory.TrapezoidProfile;
@@ -6,7 +6,7 @@ import edu.wpi.first.math.util.Units;
 import frc.robot.ModeSetter;
 
 // Define the ArmConstants class as a final utility class
-public final class ArmConstants {
+public final class CoralWristConstants {
 
   // Define the minimum angle for the arm in degrees
   public static final double minAngle = 0.0;

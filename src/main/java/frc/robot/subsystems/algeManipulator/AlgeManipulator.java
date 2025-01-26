@@ -44,20 +44,23 @@ public class AlgeManipulator extends SubsystemBase {
   // Define tunable maximum velocity and acceleration for arm motion constraints
   private static final LoggedTunableNumber maxVelocity =
       new LoggedTunableNumber(
-          "Arm/Velocity", AlgeManipulatorConstants.kArmMotionConstraint.maxVelocity);
+          "Alge Manipulator/Velocity", AlgeManipulatorConstants.kArmMotionConstraint.maxVelocity);
   private static final LoggedTunableNumber maxAcceleration =
       new LoggedTunableNumber(
-          "Arm/Acceleration", AlgeManipulatorConstants.kArmMotionConstraint.maxAcceleration);
+          "Alge Manipulator/Acceleration",
+          AlgeManipulatorConstants.kArmMotionConstraint.maxAcceleration);
 
   // Define a tunable upper limit for partial stow in degrees
   private static final LoggedTunableNumber partialStowUpperLimitDegrees =
-      new LoggedTunableNumber("Arm/PartialStowUpperLimitDegrees", 30.0);
+      new LoggedTunableNumber("Alge Manipulator/PartialStowUpperLimitDegrees", 30.0);
 
   // Define tunable lower and upper angle limits in degrees
   private static final LoggedTunableNumber lowerLimitDegrees =
-      new LoggedTunableNumber("Arm/LowerLimitDegrees", AlgeManipulatorConstants.minAngle);
+      new LoggedTunableNumber(
+          "Alge Manipulator/LowerLimitDegrees", AlgeManipulatorConstants.minAngle);
   private static final LoggedTunableNumber upperLimitDegrees =
-      new LoggedTunableNumber("Arm/UpperLimitDegrees", AlgeManipulatorConstants.maxAngle);
+      new LoggedTunableNumber(
+          "Alge Manipulator/UpperLimitDegrees", AlgeManipulatorConstants.maxAngle);
 
   // Define suppliers to determine if the arm should be disabled, in coast mode, or half stowed
   private BooleanSupplier disableSupplier = DriverStation::isDisabled;
@@ -78,9 +81,14 @@ public class AlgeManipulator extends SubsystemBase {
     // Define the STOW goal with an angle of 0 degrees
     STOW(() -> 0),
     // Define ANGLE1 goal with a tunable setpoint of 45 degrees
-    ANGLE1(new LoggedTunableNumber("Arm/ANGLE1", 45.0)),
-    // Define ANGLE2 goal with a tunable setpoint of 90 degrees
-    ANGLE2(new LoggedTunableNumber("Arm/ANGLE2", 90.0));
+    GROUND_ALGE_INTAKE(new LoggedTunableNumber("Alge Manipulator/Ground intake for alge", 0.0)),
+    L1(new LoggedTunableNumber("Alge Manipulator/L1", 0.0)),
+    PROCESSOR(new LoggedTunableNumber("Alge Manipulator/Processor", 0.0)),
+    NET(new LoggedTunableNumber("Alge Manipulator/Net", 0.0)),
+    EJECT(new LoggedTunableNumber("Alge Manipulator/Eject", 0.0)),
+    SKYFALL(new LoggedTunableNumber("Alge Manipulator/Skyfall", 0.0)), // Drop alge from reef
+    CA(new LoggedTunableNumber("Alge Manipulator/Coral on top of alge", 0.0)),
+    GROUND_CORAL_INTAKE(new LoggedTunableNumber("Alge Manipulator/Ground intake for coral", 0.0));
 
     // Supplier to provide the arm setpoint in degrees
     private final DoubleSupplier armSetpointSupplier;
@@ -189,7 +197,7 @@ public class AlgeManipulator extends SubsystemBase {
     // Update IO inputs
     io.updateInputs(inputs);
     // Process inputs for logging
-    Logger.processInputs("Arm", inputs);
+    Logger.processInputs("Alge Manipulator", inputs);
 
     // Update brake mode based on coast supplier
     setBrakeMode(!coastSupplier.getAsBoolean());
@@ -263,9 +271,9 @@ public class AlgeManipulator extends SubsystemBase {
     setpointVisualizer.update(setpointState.position);
 
     // Record various outputs for logging
-    Logger.recordOutput("Arm/SetpointAngle", setpointState.position);
-    Logger.recordOutput("Arm/SetpointVelocity", setpointState.velocity);
-    Logger.recordOutput("Arm/currentDeg", Units.radiansToDegrees(inputs.positionRads));
-    Logger.recordOutput("Arm/Goal", goal);
+    Logger.recordOutput("Alge Manipulator/SetpointAngle", setpointState.position);
+    Logger.recordOutput("Alge Manipulator/SetpointVelocity", setpointState.velocity);
+    Logger.recordOutput("Alge Manipulator/currentDeg", Units.radiansToDegrees(inputs.positionRads));
+    Logger.recordOutput("Alge Manipulator/Goal", goal);
   }
 }
