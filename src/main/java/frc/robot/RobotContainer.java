@@ -10,9 +10,14 @@ import edu.wpi.first.wpilibj.GenericHID;
 import edu.wpi.first.wpilibj.XboxController;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.Commands;
+import edu.wpi.first.wpilibj2.command.InstantCommand;
 import edu.wpi.first.wpilibj2.command.button.CommandXboxController;
 import frc.robot.commands.drive.DriveCommands;
 import frc.robot.subsystems.drive.*;
+import frc.robot.subsystems.elevator.Elevator;
+import frc.robot.subsystems.elevator.ElevatorIO;
+import frc.robot.subsystems.elevator.ElevatorIOKrakenFOC;
+import frc.robot.subsystems.elevator.ElevatorIOSim;
 import frc.robot.subsystems.vision.*;
 import org.ironmaple.simulation.SimulatedArena;
 import org.ironmaple.simulation.drivesims.SwerveDriveSimulation;
@@ -29,7 +34,7 @@ public class RobotContainer {
   // Subsystems
   private final Drive drive;
   public final Vision vision;
-  // private final Elevator elevator;
+  private final Elevator elevator;
   private SwerveDriveSimulation driveSimulation = null;
 
   // Controller
@@ -57,7 +62,7 @@ public class RobotContainer {
                 new VisionIOLimelight(VisionConstants.camera0Name, drive::getRotation),
                 new VisionIOLimelight(VisionConstants.camera1Name, drive::getRotation));
 
-        // elevator = new Elevator(new ElevatorIOKrakenFOC());
+        elevator = new Elevator(new ElevatorIOKrakenFOC());
 
         break;
       case SIM:
@@ -84,7 +89,7 @@ public class RobotContainer {
                 new VisionIOPhotonVisionSim(
                     camera1Name, robotToCamera1, driveSimulation::getSimulatedDriveTrainPose));
 
-        // elevator = new Elevator(new ElevatorIOSim());
+        elevator = new Elevator(new ElevatorIOSim());
         // AIRobotInSimulation.startOpponentRobotSimulations();
         break;
 
@@ -98,7 +103,7 @@ public class RobotContainer {
                 new ModuleIO() {},
                 new ModuleIO() {});
         vision = new Vision(drive, new VisionIO() {}, new VisionIO() {});
-        // elevator = new Elevator(new ElevatorIO() {});
+        elevator = new Elevator(new ElevatorIO() {});
         break;
     }
 
@@ -142,7 +147,8 @@ public class RobotContainer {
                 () -> new Rotation2d(0)));
 
     // Elevator Test
-    // controller.b().onTrue(new InstantCommand(() -> elevator.setGoal(Elevator.Goal.HIGH)));
+    controller.b().onTrue(new InstantCommand(() -> elevator.setGoal(Elevator.Goal.L2)));
+    controller.y().onTrue(new InstantCommand(() -> elevator.setGoal(Elevator.Goal.STOW)));
 
     // Switch to X pattern when X button is pressed
     controller.x().onTrue(Commands.runOnce(drive::stopWithX, drive));
@@ -158,6 +164,7 @@ public class RobotContainer {
             : () ->
                 drive.resetOdometry(
                     new Pose2d(drive.getPose().getTranslation(), new Rotation2d())); // zero gyro
+
     controller.start().onTrue(Commands.runOnce(resetGyro, drive).ignoringDisable(true));
   }
 

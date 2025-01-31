@@ -37,13 +37,13 @@ public class ElevatorFlywheel extends SubsystemBase {
       case REPLAY:
         // On real hardware or replay mode, use these gains
         ffModel = new SimpleMotorFeedforward(0.1, 0.05);
-        io.configurePID(1.0, 0.0, 0.0);
+        io.configureTopPID(1.0, 0.0, 0.0);
         break;
       case SIM:
         // In simulation, use different feedforward and PID gains to achieve stable behavior in the
         // model
         ffModel = new SimpleMotorFeedforward(0.0, 0.03);
-        io.configurePID(0.5, 0.0, 0.0);
+        io.configureBottomPID(0.5, 0.0, 0.0);
         break;
       default:
         // Default or unrecognized mode uses zero gains
@@ -60,7 +60,7 @@ public class ElevatorFlywheel extends SubsystemBase {
     // Update inputs from the hardware implementation
     io.updateInputs(inputs);
     // Process and log these inputs for debugging and telemetry
-    Logger.processInputs("Flywheel", inputs);
+    Logger.processInputs(" Elevator Flywheel", inputs);
   }
 
   /**
@@ -68,8 +68,12 @@ public class ElevatorFlywheel extends SubsystemBase {
    *
    * @param volts The voltage command to apply to the flywheel motor(s).
    */
-  public void runVolts(double volts) {
-    io.setVoltage(volts);
+  public void runTopVolts(double volts) {
+    io.setTopVoltage(volts);
+  }
+
+  public void runBottomVolts(double volts) {
+    io.setBottomVoltage(volts);
   }
 
   /**
@@ -77,22 +81,33 @@ public class ElevatorFlywheel extends SubsystemBase {
    *
    * @param velocityRPM The target flywheel velocity in rotations per minute (RPM).
    */
-  public void runVelocity(double velocityRPM) {
+  public void runVelocity(double topVelocityRPM, double bottomVelocityRPM) {
     // Convert velocity from RPM to radians per second for internal calculations
-    var velocityRadPerSec = Units.rotationsPerMinuteToRadiansPerSecond(velocityRPM);
+    var topVelocityRadPerSec = Units.rotationsPerMinuteToRadiansPerSecond(topVelocityRPM);
+    var bottomVelocityRadPerSec = Units.rotationsPerMinuteToRadiansPerSecond(bottomVelocityRPM);
 
     // Calculate the feedforward voltage using the feedforward model and the current velocity
     // This helps the motor controller achieve the desired speed more effectively
-    io.setVelocity(
-        velocityRadPerSec, ffModel.calculateWithVelocities(velocityRadPerSec, velocityRadPerSec));
+    io.setTopVelocity(
+        topVelocityRadPerSec,
+        ffModel.calculateWithVelocities(topVelocityRadPerSec, topVelocityRadPerSec));
+
+    io.setBottomVelocity(
+        bottomVelocityRadPerSec,
+        ffModel.calculateWithVelocities(bottomVelocityRadPerSec, bottomVelocityRadPerSec));
 
     // Log the commanded setpoint RPM for telemetry
-    Logger.recordOutput("Flywheel/SetpointRPM", velocityRPM);
+    Logger.recordOutput("Elevator Flywheel/Top SetpointRPM", topVelocityRadPerSec);
+    Logger.recordOutput("Elevator Flywheel/Bottom SetpointRPM", bottomVelocityRadPerSec);
   }
 
   /** Stops the flywheel by halting motor outputs. */
-  public void stop() {
-    io.stop();
+  public void topStop() {
+    io.topStop();
+  }
+
+  public void bottomStop() {
+    io.bottomStop();
   }
 
   /**
@@ -101,9 +116,15 @@ public class ElevatorFlywheel extends SubsystemBase {
    * @return The current flywheel speed in rotations per minute.
    */
   @AutoLogOutput
-  public double getVelocityRPM() {
+  public double getTopVelocityRPM() {
     // Converts radians per second to RPM for more human-readable units
-    return Units.radiansPerSecondToRotationsPerMinute(inputs.velocityRadPerSec);
+    return Units.radiansPerSecondToRotationsPerMinute(inputs.topVelocityRadPerSec);
+  }
+
+  @AutoLogOutput
+  public double getBottomVelocityRPM() {
+    // Converts radians per second to RPM for more human-readable units
+    return Units.radiansPerSecondToRotationsPerMinute(inputs.bottomVelocityRadPerSec);
   }
 
   /**
@@ -112,7 +133,11 @@ public class ElevatorFlywheel extends SubsystemBase {
    *
    * @return The current flywheel speed in radians per second.
    */
-  public double getCharacterizationVelocity() {
-    return inputs.velocityRadPerSec;
+  public double getTopCharacterizationVelocity() {
+    return inputs.topVelocityRadPerSec;
+  }
+
+  public double getBottomCharacterizationVelocity() {
+    return inputs.bottomVelocityRadPerSec;
   }
 }

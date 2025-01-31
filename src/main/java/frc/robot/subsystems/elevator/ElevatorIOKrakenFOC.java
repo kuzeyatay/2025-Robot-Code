@@ -56,9 +56,10 @@ public class ElevatorIOKrakenFOC implements ElevatorIO {
 
     // Leader motor configurations: PID and feedforward gains, current limits, inversion, and
     // neutral mode
-    config.Slot0.kS = ElevatorConstants.kElevatorkS; // Static feedforward gain to overcome friction
-    config.Slot0.kV = ElevatorConstants.kElevatorkG; // Velocity feedforward gain
-    config.Slot0.kA = ElevatorConstants.kElevatorkV; // Acceleration feedforward gain
+    config.Slot0.kS =
+        ElevatorConstants.gains.ffkS(); // Static feedforward gain to overcome friction
+    config.Slot0.kV = ElevatorConstants.gains.ffkV(); // Velocity feedforward gain
+    config.Slot0.kA = ElevatorConstants.gains.ffkA(); // Acceleration feedforward gain
     config.Slot0.kP = ElevatorConstants.gains.kP(); // Proportional PID gain
     config.Slot0.kI = ElevatorConstants.gains.kI(); // Integral PID gain
     config.Slot0.kD = ElevatorConstants.gains.kD(); // Derivative PID gain
@@ -161,7 +162,7 @@ public class ElevatorIOKrakenFOC implements ElevatorIO {
 
   // Sets the elevator height using a Motion Magic profile with a given feedforward voltage
   @Override
-  public void setHeight(double setpointRads, double feedforward) {
+  public void runPosition(double setpointRads, double feedforward) {
     // Creates a new MotionMagicVoltage request starting at 0 volts
     request = new MotionMagicVoltage(0);
     // Converts the setpoint from radians to rotations and applies feedforward voltage

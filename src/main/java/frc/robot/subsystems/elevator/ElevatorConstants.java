@@ -2,7 +2,6 @@ package frc.robot.subsystems.elevator;
 
 import edu.wpi.first.math.geometry.Translation2d;
 import edu.wpi.first.math.system.plant.DCMotor;
-import edu.wpi.first.math.trajectory.TrapezoidProfile;
 import edu.wpi.first.math.util.Units;
 import frc.robot.ModeSetter;
 
@@ -26,18 +25,10 @@ public class ElevatorConstants {
   // Indicates whether the follower motor is inverted
   public static final boolean followerInverted = false;
 
+  public static final double kElevatorMaxV = 10.0;
   // Defines the origin point of the elevator in 2D space; FIXME indicates it needs to be set
   // correctly
   public static final Translation2d elevatorOrigin = new Translation2d(100, 0); // FIXME ????
-
-  // Defines the static feedforward gain for the elevator (in volts)
-  public static final double kElevatorkS = 0.0; // volts (V)
-
-  // Defines the gravity compensation feedforward gain for the elevator (in volts)
-  public static final double kElevatorkG = 0.762; // volts (V)
-
-  // Defines the velocity feedforward gain for the elevator (in volts per meter per second)
-  public static final double kElevatorkV = 0.762; // volt per velocity (V/(m/s))
 
   // Defines the gearing factor for the elevator mechanism
   public static final double kElevatorGearing = 10.0;
@@ -51,22 +42,19 @@ public class ElevatorConstants {
   // Comment explaining that the encoder is zeroed at the bottom position, setting the minimum
   // height
   // Encoder is reset to measure 0 at the bottom, so minimum height is 0.
-  public static final double kMinElevatorHeightMeters = 0.05;
+  public static final double kMinElevatorHeightMeters = 0.0;
 
   // FIXME Defines the maximum height the elevator can reach in meters
-  public static final double kMaxElevatorHeightMeters = 2.20;
+  public static final double kMaxElevatorHeightMeters = 9;
 
-  // Defines the motion constraints for the elevator's trapezoidal motion profile with max velocity
-  // and acceleration
-  public static final TrapezoidProfile.Constraints elevatorMotionConstraint =
-      new TrapezoidProfile.Constraints(2.0, 2.0);
+  
 
   // FIXME TEST Defines the gains for the elevator based on the current mode using a switch
   // expression
   public static final Gains gains =
       switch (ModeSetter.currentMode) {
-        case SIM -> new Gains(75, 0.0, 0.0, 2.0, 0.0, 0.0, 0.0);
-        case REAL, REPLAY -> new Gains(10.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0);
+        case SIM -> new Gains(1000, 0.0, 2, 2.0, 9.29, 0.03, 0.19);
+        case REAL, REPLAY -> new Gains(02, 0.0, 0.0, 0.0, 9.29, 0.03, 0.19);
       };
 
   // Defines a record to hold the PID and feedforward gains for the elevator

@@ -22,8 +22,6 @@ public class ElevatorIOSim implements ElevatorIO {
           ElevatorConstants.kMinElevatorHeightMeters,
           ElevatorConstants.kMaxElevatorHeightMeters,
           true,
-          0.1,
-          0.01,
           0.0);
 
   // PIDController for running closed-loop position control on the simulated elevator
@@ -95,7 +93,7 @@ public class ElevatorIOSim implements ElevatorIO {
    * @param feedforward The feedforward voltage to apply in addition to the PID output.
    */
   @Override
-  public void setHeight(double height, double feedforward) {
+  public void runPosition(double height, double feedforward) {
     // If we previously were not in closed-loop mode, reset the controller before re-enabling
     // closed-loop control
     if (!closedLoop) {

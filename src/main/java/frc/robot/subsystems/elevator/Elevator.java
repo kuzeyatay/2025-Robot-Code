@@ -4,19 +4,18 @@ import static frc.robot.subsystems.elevator.ElevatorConstants.gains;
 
 import edu.wpi.first.math.MathUtil;
 import edu.wpi.first.math.controller.ElevatorFeedforward;
-import edu.wpi.first.math.trajectory.TrapezoidProfile;
+import edu.wpi.first.math.trajectory.ExponentialProfile;
+import edu.wpi.first.math.trajectory.ExponentialProfile.State;
+import edu.wpi.first.wpilibj.Alert;
 import edu.wpi.first.wpilibj.DriverStation;
-import edu.wpi.first.wpilibj.util.Color;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
-import frc.robot.ModeSetter;
-import frc.robot.ModeSetter.Mode;
 import frc.robot.util.EqualsUtil;
 import frc.robot.util.LoggedTunableNumber;
 import java.util.function.BooleanSupplier;
 import java.util.function.DoubleSupplier;
+import java.util.function.Supplier;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
-import lombok.Setter;
 import org.littletonrobotics.junction.AutoLogOutput;
 import org.littletonrobotics.junction.Logger;
 
@@ -42,33 +41,24 @@ public class Elevator extends SubsystemBase {
   private static final LoggedTunableNumber kG =
       new LoggedTunableNumber("Elevator/Gains/kG", gains.ffkG());
 
-  // Motion constraints for the elevator's trapezoidal profile
-  private static final LoggedTunableNumber maxVelocity =
-      new LoggedTunableNumber(
-          "Elevator/Velocity", ElevatorConstants.elevatorMotionConstraint.maxVelocity);
-  private static final LoggedTunableNumber maxAcceleration =
-      new LoggedTunableNumber(
-          "Elevator/Acceleration", ElevatorConstants.elevatorMotionConstraint.maxAcceleration);
-
-  // Physical limits for the elevator's height to prevent overextension
-  private static final LoggedTunableNumber lowerLimitHeight =
-      new LoggedTunableNumber(
-          "Elevator/LowerLimitMeters", ElevatorConstants.kMinElevatorHeightMeters);
-  private static final LoggedTunableNumber upperLimitHeight =
-      new LoggedTunableNumber(
-          "Elevator/UpperLimitMeters", ElevatorConstants.kMaxElevatorHeightMeters);
+  private final Alert motorDisconnectedAlert =
+      new Alert("Elevator motor disconnected!", Alert.AlertType.kWarning);
 
   // Suppliers to handle various override conditions
-  private BooleanSupplier disableSupplier = DriverStation::isDisabled;
-  public BooleanSupplier coastSupplier = () -> false;
-  public BooleanSupplier halfStowSupplier = () -> true;
+  private BooleanSupplier coastOverride = () -> false;
+  private BooleanSupplier disabledOverride = DriverStation::isDisabled;
+  private final ExponentialProfile profile =
+      new ExponentialProfile(
+          ExponentialProfile.Constraints.fromCharacteristics(
+              ElevatorConstants.kElevatorMaxV, kV.getAsDouble(), kA.getAsDouble()));
+
+  @AutoLogOutput(key = "Elevator/BrakeModeEnabled")
   private boolean brakeModeEnabled = true;
 
-  // Flag to indicate if the elevator is in characterization mode
-  private boolean characterizing = false;
-
-  // Desired goal height for the elevator
-  private double goalHeight;
+  @Getter private State setpoint = new State();
+  private Supplier<State> goal = State::new;
+  private boolean stopProfile = false;
+  @Getter private boolean homed = false;
 
   /**
    * Enum representing predefined goal positions for the elevator. Each goal has an associated
@@ -79,7 +69,7 @@ public class Elevator extends SubsystemBase {
   public enum Goal {
     STOW(new LoggedTunableNumber("Elevator/STOW", 0.0)),
     L1(new LoggedTunableNumber("Elevator/L1", 0.0)),
-    L2(new LoggedTunableNumber("Elevator/L2", 0.0)),
+    L2(new LoggedTunableNumber("Elevator/L2", 1.2)),
     L3(new LoggedTunableNumber("Elevator/L3", 0.0)),
     L4(new LoggedTunableNumber("Elevator/L4", 0.0)),
     PROCESSOR(new LoggedTunableNumber("Elevator/PROCESSOR", 0.0)),
@@ -95,9 +85,17 @@ public class Elevator extends SubsystemBase {
      *
      * @return The height in meters.
      */
-    private double getHeight() {
+    private double get() {
       return elevatorSetpointSupplier.getAsDouble();
     }
+  }
+
+  public void setGoal(Goal goal) {
+    setGoal(() -> new State(goal.get(), 0.0));
+  }
+
+  public void setGoal(Supplier<State> goal) {
+    this.goal = goal;
   }
 
   /**
@@ -107,27 +105,14 @@ public class Elevator extends SubsystemBase {
    */
   @AutoLogOutput(key = "Elevator/AtGoal")
   public boolean atGoal() {
-    return EqualsUtil.epsilonEquals(setpointState.position, goalHeight, 1e-3);
+    return EqualsUtil.epsilonEquals(setpoint.position, goal.get().position, 1e-3);
   }
 
   // Current goal of the elevator, with getter and setter
-  @AutoLogOutput @Getter @Setter private Goal goal = Goal.STOW;
 
   // Interface to interact with the elevator hardware
   private ElevatorIO io;
   private final ElevatorIOInputsAutoLogged inputs = new ElevatorIOInputsAutoLogged();
-
-  // Trapezoidal motion profile for smooth elevator movement
-  public TrapezoidProfile profile;
-  private TrapezoidProfile.State setpointState = new TrapezoidProfile.State();
-
-  // Visualizers for monitoring elevator states
-  private final ElevatorVisualizer measuredVisualizer;
-  private final ElevatorVisualizer setpointVisualizer;
-  private final ElevatorVisualizer goalVisualizer;
-
-  // Flag to track if the robot was not in autonomous mode
-  private boolean wasNotAuto = false;
 
   // Feedforward controller for the elevator
   public ElevatorFeedforward ff;
@@ -141,51 +126,17 @@ public class Elevator extends SubsystemBase {
     this.io = io;
     io.setBrakeMode(true); // Engage brake mode by default
 
-    // Initialize the trapezoidal profile with current motion constraints
-    profile =
-        new TrapezoidProfile(
-            new TrapezoidProfile.Constraints(maxVelocity.get(), maxAcceleration.get()));
-
     // Set PID gains for the elevator
     io.setPID(kP.get(), kI.get(), kD.get());
 
     // Initialize the feedforward controller with current gains
     ff = new ElevatorFeedforward(kS.get(), kG.get(), kV.get(), kA.get());
-
-    // Re-initialize the trapezoidal profile (redundant, can be removed)
-    profile =
-        new TrapezoidProfile(
-            new TrapezoidProfile.Constraints(maxVelocity.get(), maxAcceleration.get()));
-
-    // Initialize visualizers with distinct colors for clarity
-    measuredVisualizer = new ElevatorVisualizer("Measured", Color.kPurple);
-    setpointVisualizer = new ElevatorVisualizer("Setpoint", Color.kBrown);
-    goalVisualizer = new ElevatorVisualizer("Goal", Color.kKhaki);
   }
 
-  /**
-   * Sets override suppliers for disabling, coasting, and half-stowing the elevator.
-   *
-   * @param disableOverride Supplier that returns true to disable the elevator.
-   * @param coastOverride Supplier that returns true to enable coasting mode.
-   * @param halfStowOverride Supplier that returns true to half-stow the elevator.
-   */
-  public void setOverrides(
-      BooleanSupplier disableOverride,
-      BooleanSupplier coastOverride,
-      BooleanSupplier halfStowOverride) {
-    disableSupplier = () -> disableOverride.getAsBoolean() || DriverStation.isDisabled();
-    coastSupplier = coastOverride;
-    halfStowSupplier = halfStowOverride;
-  }
-
-  /**
-   * Retrieves the stow height for the elevator.
-   *
-   * @return The stow height in meters.
-   */
-  private double getStowHeight() {
-    return ElevatorConstants.kMinElevatorHeightMeters;
+  public void setOverrides(BooleanSupplier coastOverride, BooleanSupplier disabledOverride) {
+    this.coastOverride = coastOverride;
+    this.disabledOverride =
+        () -> this.disabledOverride.getAsBoolean() && disabledOverride.getAsBoolean();
   }
 
   /**
@@ -205,16 +156,19 @@ public class Elevator extends SubsystemBase {
    */
   @Override
   public void periodic() {
-    // Update inputs from the elevator hardware
     io.updateInputs(inputs);
     Logger.processInputs("Elevator", inputs);
+    motorDisconnectedAlert.set(!(inputs.leaderMotorConnected && inputs.followerMotorConnected));
 
-    // Update brake mode based on the coast supplier
-    setBrakeMode(!coastSupplier.getAsBoolean());
+    // Set coast mode
+    setBrakeMode(!coastOverride.getAsBoolean());
 
     // Update PID and feedforward controllers if gains have changed
-    LoggedTunableNumber.ifChanged(
-        hashCode(), () -> io.setPID(kP.get(), kI.get(), kD.get()), kP, kI, kD);
+    // Update tunable numbers
+    if (kP.hasChanged(hashCode()) || kD.hasChanged(hashCode())) {
+      io.setPID(kP.get(), 0.0, kD.get());
+    }
+
     LoggedTunableNumber.ifChanged(
         hashCode(),
         () -> ff = new ElevatorFeedforward(kS.get(), kG.get(), kV.get(), kA.get()),
@@ -223,59 +177,42 @@ public class Elevator extends SubsystemBase {
         kV,
         kA);
 
-    // Check if the elevator should be disabled (e.g., robot is disabled or in simulation auto mode)
-    if (disableSupplier.getAsBoolean()
-        || (ModeSetter.currentMode == Mode.SIM
-            && DriverStation.isAutonomousEnabled()
-            && wasNotAuto)) {
-      io.stop(); // Stop all elevator motors
-      // Reset the motion profile when disabled
-      setpointState = new TrapezoidProfile.State(inputs.positionMeters, 0);
+    final boolean shouldRunProfile =
+        !stopProfile && !coastOverride.getAsBoolean() && !disabledOverride.getAsBoolean();
+
+    Logger.recordOutput("Elevator/RunningProfile", shouldRunProfile);
+
+    // Run profile
+    if (shouldRunProfile) {
+      // Clamp goal
+      var goalState =
+          new State(
+              MathUtil.clamp(
+                  goal.get().position,
+                  ElevatorConstants.kMinElevatorHeightMeters,
+                  ElevatorConstants.kMaxElevatorHeightMeters),
+              0.0);
+      setpoint = profile.calculate(0.02, setpoint, goalState);
+      double feedforwardOutput = ff.calculateWithVelocities(setpoint.velocity, setpoint.velocity);
+      io.runPosition(setpoint.position, feedforwardOutput);
+
+      // Log state
+      // Log various elevator states for telemetry
+      Logger.recordOutput("Elevator/SetpointHeight", setpoint.position);
+      Logger.recordOutput("Elevator/SetpointVelocity", setpoint.velocity);
+      Logger.recordOutput("Elevator/currentHeight", inputs.positionMeters);
+      Logger.recordOutput("Elevator/Goal", goal.get().position);
+    } else {
+      Logger.recordOutput("Elevator/SetpointHeight", 0.0);
+      Logger.recordOutput("Elevator/SetpointVelocity", 0.0);
+      Logger.recordOutput("Elevator/currentHeight", 0.0);
+      Logger.recordOutput("Elevator/Goal", 0.0);
     }
-
-    // Track if the robot was not in autonomous mode
-    wasNotAuto = !DriverStation.isAutonomousEnabled();
-
-    // Only run the motion profile if not characterizing, not in coast mode, and not disabled
-    if (!characterizing && brakeModeEnabled && !disableSupplier.getAsBoolean()) {
-      // Determine the goal height based on the current goal
-      goalHeight = goal.getHeight();
-      if (goal == Goal.STOW) {
-        goalHeight = getStowHeight();
-      }
-
-      // Calculate the next state in the motion profile
-      setpointState =
-          profile.calculate(
-              0.02, // Time step (assuming 20ms periodic rate)
-              setpointState, // Current state
-              new TrapezoidProfile.State(
-                  MathUtil.clamp(goalHeight, lowerLimitHeight.get(), upperLimitHeight.get()),
-                  0.0)); // Goal state
-
-      // If stowing and at the minimum height, stop the elevator
-      if (goal == Goal.STOW
-          && EqualsUtil.epsilonEquals(goalHeight, ElevatorConstants.kMinElevatorHeightMeters)
-          && atGoal()) {
-        io.stop();
-      } else {
-        // Apply height control with feedforward
-        io.setHeight(setpointState.position, ff.calculate(setpointState.velocity) / 12.0);
-      }
-
-      // Update visualizers with the current goal height
-      goalVisualizer.update(goalHeight);
-      Logger.recordOutput("Elevator/GoalHeight", goalHeight);
-    }
-
-    // Update visualizers with measured and setpoint heights
-    measuredVisualizer.update(inputs.positionMeters);
-    setpointVisualizer.update(setpointState.position);
-
-    // Log various elevator states for telemetry
-    Logger.recordOutput("Elevator/SetpointHeight", setpointState.position);
-    Logger.recordOutput("Elevator/SetpointVelocity", setpointState.velocity);
-    Logger.recordOutput("Elevator/currentHeight", inputs.positionMeters);
-    Logger.recordOutput("Elevator/Goal", goal);
+    // Log state
+    Logger.recordOutput("Elevator/CoastOverride", coastOverride.getAsBoolean());
+    Logger.recordOutput("Elevator/DisabledOverride", disabledOverride.getAsBoolean());
+    Logger.recordOutput(
+        "Elevator/MeasuredVelocityMetersPerSec",
+        inputs.velocityMetersPerSecond * ElevatorConstants.kElevatorDrumRadius);
   }
 }

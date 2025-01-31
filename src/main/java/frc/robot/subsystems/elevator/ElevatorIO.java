@@ -42,7 +42,8 @@ public interface ElevatorIO {
   // Comment describing the method setHeight
   /* Sets the climber to a height setpoint via motion magic */
   // Default method to set the elevator to a specific height with feedforward
-  public default void setHeight(double height, double feedforward) {}
+
+  default void runPosition(double positionRad, double feedforward) {}
 
   // Javadoc comment describing the stop method
   /** Stop the control loop and motor output. */
@@ -61,4 +62,6 @@ public interface ElevatorIO {
   /** Set PID values */
   // Default method to set PID controller gains for the elevator
   default void setPID(double p, double i, double d) {}
+
+  default void runOpenLoop(double output) {}
 }
