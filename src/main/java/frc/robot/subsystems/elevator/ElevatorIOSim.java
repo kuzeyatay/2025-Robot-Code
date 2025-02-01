@@ -16,7 +16,7 @@ public class ElevatorIOSim implements ElevatorIO {
   private final ElevatorSim sim =
       new ElevatorSim(
           ElevatorConstants.elevatorGearbox,
-          ElevatorConstants.kElevatorGearing,
+          ElevatorConstants.elevatorGearRatio,
           ElevatorConstants.kCarriageMass,
           ElevatorConstants.kElevatorDrumRadius,
           ElevatorConstants.kMinElevatorHeightMeters,

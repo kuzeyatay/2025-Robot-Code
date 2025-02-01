@@ -1,5 +1,6 @@
 package frc.robot.subsystems.algeManipulator;
 
+import static edu.wpi.first.units.Units.Volts;
 import static frc.robot.subsystems.algeManipulator.AlgeManipulatorConstants.gains;
 
 import edu.wpi.first.math.MathUtil;
@@ -8,7 +9,9 @@ import edu.wpi.first.math.trajectory.TrapezoidProfile;
 import edu.wpi.first.math.util.Units;
 import edu.wpi.first.wpilibj.DriverStation;
 import edu.wpi.first.wpilibj.util.Color;
+import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
+import edu.wpi.first.wpilibj2.command.sysid.SysIdRoutine;
 import frc.robot.ModeSetter;
 import frc.robot.ModeSetter.Mode;
 import frc.robot.util.EqualsUtil;
@@ -71,6 +74,19 @@ public class AlgeManipulator extends SubsystemBase {
 
   // Flag to indicate if the arm is in characterization mode
   private boolean characterizing = false;
+  // Interface for Arm IO operations
+  private AlgeManipulatorIO io;
+  // Creates a SysIdRoutine
+  SysIdRoutine routine = // Configure SysId
+      new SysIdRoutine(
+          new SysIdRoutine.Config(
+              null,
+              null,
+              null,
+              (state) -> Logger.recordOutput("Alge Manipulator/SysIdState", state.toString())),
+          new SysIdRoutine.Mechanism(
+              (voltage) -> runCharacterization(voltage.in(Volts)), null, this));
+  ;
 
   // Variable to store the goal angle in radians
   private double goalAngle;
@@ -83,7 +99,7 @@ public class AlgeManipulator extends SubsystemBase {
     // Define ANGLE1 goal with a tunable setpoint of 45 degrees
     GROUND_ALGE_INTAKE(new LoggedTunableNumber("Alge Manipulator/Ground intake for alge", 0.0)),
     L1(new LoggedTunableNumber("Alge Manipulator/L1", 0.0)),
-    PROCESSOR(new LoggedTunableNumber("Alge Manipulator/Processor", 0.0)),
+    PROCESSOR(new LoggedTunableNumber("Alge Manipulator/Processor", 75.0)),
     NET(new LoggedTunableNumber("Alge Manipulator/Net", 0.0)),
     EJECT(new LoggedTunableNumber("Alge Manipulator/Eject", 0.0)),
     SKYFALL(new LoggedTunableNumber("Alge Manipulator/Skyfall", 0.0)), // Drop alge from reef
@@ -100,7 +116,7 @@ public class AlgeManipulator extends SubsystemBase {
   }
 
   // Method to determine if the arm is at its goal position within a small epsilon
-  @AutoLogOutput(key = "Arm/AtGoal")
+  @AutoLogOutput(key = "Alge Manipulator/AtGoal")
   public boolean atGoal() {
     return EqualsUtil.epsilonEquals(setpointState.position, goalAngle, 1e-3);
   }
@@ -108,8 +124,6 @@ public class AlgeManipulator extends SubsystemBase {
   // Getter and Setter for the current goal with auto-logging
   @AutoLogOutput @Getter @Setter private Goal goal = Goal.STOW;
 
-  // Interface for Arm IO operations
-  private AlgeManipulatorIO io;
   // Inputs for logging purposes
   private final AlgeManipulatorIOInputsAutoLogged inputs = new AlgeManipulatorIOInputsAutoLogged();
 
@@ -262,7 +276,7 @@ public class AlgeManipulator extends SubsystemBase {
       // Update the goal visualizer with the current goal angle
       goalVisualizer.update(goalAngle);
       // Record the goal angle for logging
-      Logger.recordOutput("AlgeManipulator/GoalAngle", goalAngle);
+      Logger.recordOutput("Alge Manipulator/GoalAngle", goalAngle);
     }
 
     // Update the measured visualizer with the current position
@@ -275,5 +289,46 @@ public class AlgeManipulator extends SubsystemBase {
     Logger.recordOutput("Alge Manipulator/SetpointVelocity", setpointState.velocity);
     Logger.recordOutput("Alge Manipulator/currentDeg", Units.radiansToDegrees(inputs.positionRads));
     Logger.recordOutput("Alge Manipulator/Goal", goal);
+  }
+
+  /** Runs the arm with the specified output */
+  public void runCharacterization(double output) {
+    io.runOpenLoop(output);
+  }
+
+  @AutoLogOutput(key = "Alge Manipulator/motorHasReachedForwardLimit")
+  public boolean motorHasReachedForwardLimit() {
+    return EqualsUtil.epsilonEquals(
+        inputs.positionRads, Units.degreesToRadians(AlgeManipulator.upperLimitDegrees.get()), 1e-3);
+  }
+
+  @AutoLogOutput(key = "Alge Manipulator/motorHasReachedBackwardsLimit")
+  public boolean motorHasReachedBackwardsLimit() {
+    return EqualsUtil.epsilonEquals(
+        inputs.positionRads, Units.degreesToRadians(AlgeManipulator.lowerLimitDegrees.get()), 1e-3);
+  }
+
+  public Command sysIdQuasistatic(SysIdRoutine.Direction direction) {
+    return routine.quasistatic(direction);
+  }
+
+  public Command sysIdDynamic(SysIdRoutine.Direction direction) {
+    return routine.dynamic(direction);
+  }
+
+  public void quastaticTest() {
+    sysIdQuasistatic(SysIdRoutine.Direction.kForward)
+        .until(() -> motorHasReachedForwardLimit())
+        .andThen(
+            sysIdQuasistatic(SysIdRoutine.Direction.kReverse)
+                .until(() -> motorHasReachedForwardLimit()));
+  }
+
+  public void dynamicTest() {
+    sysIdQuasistatic(SysIdRoutine.Direction.kForward)
+        .until(() -> motorHasReachedForwardLimit())
+        .andThen(
+            sysIdQuasistatic(SysIdRoutine.Direction.kForward)
+                .until(() -> motorHasReachedBackwardsLimit()));
   }
 }

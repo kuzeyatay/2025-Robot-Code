@@ -13,6 +13,18 @@ import edu.wpi.first.wpilibj2.command.Commands;
 import edu.wpi.first.wpilibj2.command.InstantCommand;
 import edu.wpi.first.wpilibj2.command.button.CommandXboxController;
 import frc.robot.commands.drive.DriveCommands;
+import frc.robot.subsystems.algeManipulator.AlgeManipulator;
+import frc.robot.subsystems.algeManipulator.AlgeManipulatorIO;
+import frc.robot.subsystems.algeManipulator.AlgeManipulatorIOKrakenFOC;
+import frc.robot.subsystems.algeManipulator.AlgeManipulatorIOSim;
+import frc.robot.subsystems.coralFlywheels.CoralFlywheel;
+import frc.robot.subsystems.coralFlywheels.CoralFlywheelIO;
+import frc.robot.subsystems.coralFlywheels.CoralFlywheelIOSim;
+import frc.robot.subsystems.coralFlywheels.CoralFlywheelIOSparkMax;
+import frc.robot.subsystems.coralWrist.CoralWrist;
+import frc.robot.subsystems.coralWrist.CoralWristIO;
+import frc.robot.subsystems.coralWrist.CoralWristIOKrakenFOC;
+import frc.robot.subsystems.coralWrist.CoralWristIOSim;
 import frc.robot.subsystems.drive.*;
 import frc.robot.subsystems.elevator.Elevator;
 import frc.robot.subsystems.elevator.ElevatorIO;
@@ -35,6 +47,9 @@ public class RobotContainer {
   private final Drive drive;
   public final Vision vision;
   private final Elevator elevator;
+  private final AlgeManipulator algeManipulator;
+  private final CoralFlywheel coralFlywheel;
+  private final CoralWrist coralWrist;
   private SwerveDriveSimulation driveSimulation = null;
 
   // Controller
@@ -63,6 +78,9 @@ public class RobotContainer {
                 new VisionIOLimelight(VisionConstants.camera1Name, drive::getRotation));
 
         elevator = new Elevator(new ElevatorIOKrakenFOC());
+        algeManipulator = new AlgeManipulator(new AlgeManipulatorIOKrakenFOC());
+        coralWrist = new CoralWrist(new CoralWristIOKrakenFOC());
+        coralFlywheel = new CoralFlywheel(new CoralFlywheelIOSparkMax());
 
         break;
       case SIM:
@@ -90,6 +108,9 @@ public class RobotContainer {
                     camera1Name, robotToCamera1, driveSimulation::getSimulatedDriveTrainPose));
 
         elevator = new Elevator(new ElevatorIOSim());
+        algeManipulator = new AlgeManipulator(new AlgeManipulatorIOSim());
+        coralWrist = new CoralWrist(new CoralWristIOSim());
+        coralFlywheel = new CoralFlywheel(new CoralFlywheelIOSim());
         // AIRobotInSimulation.startOpponentRobotSimulations();
         break;
 
@@ -104,6 +125,9 @@ public class RobotContainer {
                 new ModuleIO() {});
         vision = new Vision(drive, new VisionIO() {}, new VisionIO() {});
         elevator = new Elevator(new ElevatorIO() {});
+        algeManipulator = new AlgeManipulator(new AlgeManipulatorIO() {});
+        coralWrist = new CoralWrist(new CoralWristIO() {});
+        coralFlywheel = new CoralFlywheel(new CoralFlywheelIO() {});
         break;
     }
 
@@ -149,6 +173,14 @@ public class RobotContainer {
     // Elevator Test
     controller.b().onTrue(new InstantCommand(() -> elevator.setGoal(Elevator.Goal.L2)));
     controller.y().onTrue(new InstantCommand(() -> elevator.setGoal(Elevator.Goal.STOW)));
+
+    controller
+        .b()
+        .onTrue(new InstantCommand(() -> algeManipulator.setGoal(AlgeManipulator.Goal.PROCESSOR)));
+
+    controller
+        .x()
+        .onTrue(new InstantCommand(() -> algeManipulator.setGoal(AlgeManipulator.Goal.STOW)));
 
     // Switch to X pattern when X button is pressed
     controller.x().onTrue(Commands.runOnce(drive::stopWithX, drive));

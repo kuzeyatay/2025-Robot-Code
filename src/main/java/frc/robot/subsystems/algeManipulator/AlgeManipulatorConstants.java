@@ -21,7 +21,7 @@ public final class AlgeManipulatorConstants {
   // Define the origin point of the arm using Translation2d (FIXME indicates this may need
   // attention)
   public static final Translation2d armOrigin = new Translation2d(0, 0); // FIXME ????
-
+  public static final double kArmMass = 0.5; // Kilograms
   // Calculate the gear ratio for the arm based on multiple gear stages
   public static final double kArmGearRatio = (42.0 / 12.0);
 
@@ -43,16 +43,16 @@ public final class AlgeManipulatorConstants {
   // Define the motion constraints for the arm using trapezoidal profiling (max velocity and
   // acceleration)
   public static final TrapezoidProfile.Constraints kArmMotionConstraint =
-      new TrapezoidProfile.Constraints(2.0, 2.0);
+      new TrapezoidProfile.Constraints(20.0, 20.0);
 
   // Define the length of the arm in meters by converting from inches
-  public static final double armLength = Units.inchesToMeters(20);
+  public static final double armLength = 0.305;
 
   // Define the PID and feedforward gains based on the current mode (SIM, REAL, REPLAY)
   public static final Gains gains =
       switch (ModeSetter.currentMode) {
           // In simulation mode, use higher kP and set other gains accordingly
-        case SIM -> new Gains(100, 0.0, 0.0, 2.0, 0.0, 0.0, 0.0);
+        case SIM -> new Gains(4.5, 0.0, 0.0, 0.0, 0.07, 0.02, 0.2);
           // In real or replay modes, use different gains for actual hardware
         case REAL, REPLAY -> new Gains(75.0, 0.0, 0, 0.0, 0.0, 0.0, 0.0);
       };

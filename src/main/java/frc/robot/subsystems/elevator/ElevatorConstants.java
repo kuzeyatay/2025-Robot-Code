@@ -30,14 +30,11 @@ public class ElevatorConstants {
   // correctly
   public static final Translation2d elevatorOrigin = new Translation2d(100, 0); // FIXME ????
 
-  // Defines the gearing factor for the elevator mechanism
-  public static final double kElevatorGearing = 10.0;
-
   // Defines the radius of the drum driving the elevator, converted from inches to meters
   public static final double kElevatorDrumRadius = Units.inchesToMeters(1.41 / 2.0);
 
   // FIXME Defines the mass of the elevator carriage in kilograms
-  public static final double kCarriageMass = 17.5; // kg
+  public static final double kCarriageMass = 25.5; // kg
 
   // Comment explaining that the encoder is zeroed at the bottom position, setting the minimum
   // height
@@ -45,9 +42,7 @@ public class ElevatorConstants {
   public static final double kMinElevatorHeightMeters = 0.0;
 
   // FIXME Defines the maximum height the elevator can reach in meters
-  public static final double kMaxElevatorHeightMeters = 9;
-
-  
+  public static final double kMaxElevatorHeightMeters = 1.2;
 
   // FIXME TEST Defines the gains for the elevator based on the current mode using a switch
   // expression

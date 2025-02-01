@@ -71,6 +71,8 @@ public interface AlgeManipulatorIO {
    */
   default void setPID(double p, double i, double d) {}
 
+  default void runOpenLoop(double output) {}
+
   /** Default method to stop all arm motors immediately. */
   default void stop() {}
 }

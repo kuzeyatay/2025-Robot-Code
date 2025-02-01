@@ -263,4 +263,9 @@ public class AlgeManipulatorIOKrakenFOC implements AlgeManipulatorIO {
     // Send a NeutralOut control command to stop the leader TalonFX motor
     leaderTalon.setControl(new NeutralOut());
   }
+
+  @Override
+  public void runOpenLoop(double output) {
+    runVolts(output);
+  }
 }

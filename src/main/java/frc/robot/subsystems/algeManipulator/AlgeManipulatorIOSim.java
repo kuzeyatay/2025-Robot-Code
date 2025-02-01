@@ -24,11 +24,12 @@ public class AlgeManipulatorIOSim implements AlgeManipulatorIO {
       new SingleJointedArmSim(
           DCMotor.getKrakenX60Foc(1),
           AlgeManipulatorConstants.kArmGearRatio,
-          1.06328,
+          SingleJointedArmSim.estimateMOI(
+              AlgeManipulatorConstants.armLength, AlgeManipulatorConstants.kArmMass),
           AlgeManipulatorConstants.armLength,
           AlgeManipulatorConstants.minAngle,
           AlgeManipulatorConstants.maxAngle,
-          false,
+          true,
           Units.degreesToRadians(0.0));
 
   // Initialize a PIDController with initial gains set to 0.0
@@ -147,5 +148,10 @@ public class AlgeManipulatorIOSim implements AlgeManipulatorIO {
     // Calculate the new position offset by subtracting the current simulated angle from the desired
     // position
     positionOffset = position - sim.getAngleRads();
+  }
+
+  @Override
+  public void runOpenLoop(double output) {
+    runVolts(output);
   }
 }
