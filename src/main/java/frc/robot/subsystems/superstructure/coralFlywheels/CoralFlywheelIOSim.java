@@ -1,4 +1,4 @@
-package frc.robot.subsystems.elevatorFlywheels;
+package frc.robot.subsystems.superstructure.coralFlywheels;
 
 import edu.wpi.first.math.MathUtil;
 import edu.wpi.first.math.controller.PIDController;
@@ -11,18 +11,18 @@ import edu.wpi.first.wpilibj.simulation.FlywheelSim;
  * FlywheelSim class to model the behavior of a flywheel in a simulation environment, allowing for
  * testing and tuning of control logic without actual hardware.
  */
-public class ElevatorFlywheelIOSim implements ElevatorFlywheelIO {
+public class CoralFlywheelIOSim implements CoralFlywheelIO {
   // Creates a FlywheelSim instance, modeling a flywheel with NEO motor and given moment of inertia
   // and gearing
   private FlywheelSim sim =
       new FlywheelSim(
-          LinearSystemId.createFlywheelSystem(DCMotor.getNEO(1), 0.03, 1), DCMotor.getNEO(1));
+          LinearSystemId.createFlywheelSystem(DCMotor.getNEO(1), 0.003, 1), DCMotor.getNEO(1));
 
   // PIDController for closed-loop velocity control of the simulated flywheel
   private PIDController pid = new PIDController(0.0, 0.0, 0.0);
 
   // Flag indicating whether the flywheel is running in closed-loop mode
-  private boolean closedLoop = false;
+  private boolean closedLoop = true;
 
   // Variables for storing feedforward voltage and currently applied volts to the simulated motor
   private double ffVolts = 0.0;
@@ -35,13 +35,13 @@ public class ElevatorFlywheelIOSim implements ElevatorFlywheelIO {
    * @param inputs The FlywheelIOInputs instance to populate with current simulation data.
    */
   @Override
-  public void updateInputs(ElevatorFlywheelIOInputs inputs) {
+  public void updateInputs(CoralFlywheelIOInputs inputs) {
     // If running in closed-loop mode, compute the output using PID and feedforward, then apply the
     // voltage
     if (closedLoop) {
       // Calculates the required voltage by combining PID output and feedforward
       appliedVolts =
-          MathUtil.clamp(pid.calculate(sim.getAngularVelocityRadPerSec()) + ffVolts, -12.0, 12.0);
+          MathUtil.clamp(pid.calculate(sim.getAngularVelocityRadPerSec() + ffVolts), -12.0, 12.0);
       sim.setInputVoltage(appliedVolts);
     }
 
@@ -49,27 +49,16 @@ public class ElevatorFlywheelIOSim implements ElevatorFlywheelIO {
     sim.update(0.02);
 
     // Since this simulation might not track absolute position, we set position to 0.0
-    inputs.topPositionRad = 0.0;
+    inputs.positionRad = 0.0;
 
     // Reports the current angular velocity in radians per second from the simulation
-    inputs.topVelocityRadPerSec = sim.getAngularVelocityRadPerSec();
+    inputs.velocityRadPerSec = sim.getAngularVelocityRadPerSec();
 
     // Reports the currently applied voltage to the simulated motor
-    inputs.topAppliedVolts = appliedVolts;
+    inputs.appliedVolts = appliedVolts;
 
     // Reports the current draw of the simulated motor in amps
-    inputs.topCurrentAmps = new double[] {sim.getCurrentDrawAmps()};
-
-    inputs.bottomPositionRad = 0.0;
-
-    // Reports the current angular velocity in radians per second from the simulation
-    inputs.bottomVelocityRadPerSec = sim.getAngularVelocityRadPerSec();
-
-    // Reports the currently applied voltage to the simulated motor
-    inputs.bottomAppliedVolts = appliedVolts;
-
-    // Reports the current draw of the simulated motor in amps
-    inputs.bottomCurrentAmps = new double[] {sim.getCurrentDrawAmps()};
+    inputs.currentAmps = new double[] {sim.getCurrentDrawAmps()};
   }
 
   /**
@@ -79,14 +68,7 @@ public class ElevatorFlywheelIOSim implements ElevatorFlywheelIO {
    * @param volts The voltage command to apply to the simulated flywheel.
    */
   @Override
-  public void setTopVoltage(double volts) {
-    closedLoop = false;
-    appliedVolts = volts;
-    sim.setInputVoltage(volts);
-  }
-
-  @Override
-  public void setBottomVoltage(double volts) {
+  public void setVoltage(double volts) {
     closedLoop = false;
     appliedVolts = volts;
     sim.setInputVoltage(volts);
@@ -100,14 +82,7 @@ public class ElevatorFlywheelIOSim implements ElevatorFlywheelIO {
    * @param ffVolts The feedforward voltage to apply alongside PID output.
    */
   @Override
-  public void setTopVelocity(double velocityRadPerSec, double ffVolts) {
-    closedLoop = true;
-    pid.setSetpoint(velocityRadPerSec);
-    this.ffVolts = ffVolts;
-  }
-
-  @Override
-  public void setBottomVelocity(double velocityRadPerSec, double ffVolts) {
+  public void setVelocity(double velocityRadPerSec, double ffVolts) {
     closedLoop = true;
     pid.setSetpoint(velocityRadPerSec);
     this.ffVolts = ffVolts;
@@ -117,13 +92,8 @@ public class ElevatorFlywheelIOSim implements ElevatorFlywheelIO {
    * Stops the flywheel by setting the applied voltage to zero and disabling closed-loop control.
    */
   @Override
-  public void topStop() {
-    setTopVoltage(0.0);
-  }
-
-  @Override
-  public void bottomStop() {
-    setBottomVoltage(0.0);
+  public void stop() {
+    setVoltage(0.0);
   }
 
   /**
@@ -134,12 +104,7 @@ public class ElevatorFlywheelIOSim implements ElevatorFlywheelIO {
    * @param kD Derivative gain
    */
   @Override
-  public void configureTopPID(double kP, double kI, double kD) {
-    pid.setPID(kP, kI, kD);
-  }
-
-  @Override
-  public void configureBottomPID(double kP, double kI, double kD) {
+  public void configurePID(double kP, double kI, double kD) {
     pid.setPID(kP, kI, kD);
   }
 }
