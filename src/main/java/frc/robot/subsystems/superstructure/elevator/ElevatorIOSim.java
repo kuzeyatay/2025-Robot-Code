@@ -134,6 +134,10 @@ public class ElevatorIOSim implements ElevatorIO {
     sim.setInputVoltage(appliedVoltage);
   }
 
+  @Override
+  public void runOpenLoop(double output) {
+    runVolts(output);
+  }
   /** Stops the elevator by setting the applied voltage to zero, halting motion. */
   @Override
   public void stop() {

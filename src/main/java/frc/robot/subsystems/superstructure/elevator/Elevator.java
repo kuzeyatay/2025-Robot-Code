@@ -8,6 +8,9 @@ import edu.wpi.first.math.trajectory.ExponentialProfile;
 import edu.wpi.first.math.trajectory.ExponentialProfile.State;
 import edu.wpi.first.wpilibj.Alert;
 import edu.wpi.first.wpilibj.DriverStation;
+import edu.wpi.first.wpilibj.Timer;
+import edu.wpi.first.wpilibj2.command.Command;
+import edu.wpi.first.wpilibj2.command.Commands;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
 import frc.robot.util.EqualsUtil;
 import frc.robot.util.LoggedTunableNumber;
@@ -41,6 +44,9 @@ public class Elevator extends SubsystemBase {
   private static final LoggedTunableNumber kG =
       new LoggedTunableNumber("Elevator/Gains/kG", gains.ffkG());
 
+  private static final LoggedTunableNumber staticCharacterizationVelocityThresh =
+      new LoggedTunableNumber("Elevator/StaticCharacterizationVelocityThresh", 0.0675);
+
   private final Alert motorDisconnectedAlert =
       new Alert("Elevator motor disconnected!", Alert.AlertType.kWarning);
 
@@ -58,7 +64,6 @@ public class Elevator extends SubsystemBase {
   @Getter private State setpoint = new State();
   private Supplier<State> goal = State::new;
   private boolean stopProfile = false;
-  @Getter private boolean homed = false;
 
   /**
    * Enum representing predefined goal positions for the elevator. Each goal has an associated
@@ -69,7 +74,7 @@ public class Elevator extends SubsystemBase {
   public enum Goal {
     STOW(new LoggedTunableNumber("Elevator/STOW", 0.0)),
     L1(new LoggedTunableNumber("Elevator/L1", 0.0)),
-    L2(new LoggedTunableNumber("Elevator/L2", 1.2)),
+    L2(new LoggedTunableNumber("Elevator/L2", 0.8)),
     L3(new LoggedTunableNumber("Elevator/L3", 0.0)),
     L4(new LoggedTunableNumber("Elevator/L4", 0.0)),
     PROCESSOR(new LoggedTunableNumber("Elevator/PROCESSOR", 0.0)),
@@ -214,5 +219,32 @@ public class Elevator extends SubsystemBase {
     Logger.recordOutput(
         "Elevator/MeasuredVelocityMetersPerSec",
         inputs.velocityMetersPerSecond * ElevatorConstants.kElevatorDrumRadius);
+  }
+
+  public Command staticCharacterization(double outputRampRate) {
+    final StaticCharacterizationState state = new StaticCharacterizationState();
+    Timer timer = new Timer();
+    return Commands.startRun(
+            () -> {
+              stopProfile = true;
+              timer.restart();
+            },
+            () -> {
+              state.characterizationOutput = outputRampRate * timer.get();
+              io.runOpenLoop(state.characterizationOutput);
+              Logger.recordOutput(
+                  "Elevator/StaticCharacterizationOutput", state.characterizationOutput);
+            })
+        .until(() -> inputs.velocityMetersPerSecond >= staticCharacterizationVelocityThresh.get())
+        .finallyDo(
+            () -> {
+              stopProfile = false;
+              timer.stop();
+              Logger.recordOutput("Elevator/CharacterizationOutput", state.characterizationOutput);
+            });
+  }
+
+  private static class StaticCharacterizationState {
+    public double characterizationOutput = 0.0;
   }
 }

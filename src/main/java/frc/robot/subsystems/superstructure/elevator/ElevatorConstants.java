@@ -14,10 +14,10 @@ public class ElevatorConstants {
   public static final double elevatorGearRatio = 8.46;
 
   // Defines the CAN ID for the leader motor of the elevator
-  public static final int leaderID = 15;
+  public static final int leaderID = 13;
 
   // Defines the CAN ID for the follower motor of the elevator
-  public static final int followerID = 16;
+  public static final int followerID = 14;
 
   // Indicates whether the leader motor is inverted
   public static final boolean leaderInverted = false;
@@ -49,7 +49,7 @@ public class ElevatorConstants {
   public static final Gains gains =
       switch (ModeSetter.currentMode) {
         case SIM -> new Gains(1000, 0.0, 2, 2.0, 9.29, 0.03, 0.19);
-        case REAL, REPLAY -> new Gains(02, 0.0, 0.0, 0.0, 9.29, 0.03, 0.19);
+        case REAL, REPLAY -> new Gains(10, .0, 0.0, 0.0, 9.29, 0.03, 0.19);
       };
 
   // Defines a record to hold the PID and feedforward gains for the elevator
