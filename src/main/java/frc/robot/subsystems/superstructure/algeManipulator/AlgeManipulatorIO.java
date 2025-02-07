@@ -10,8 +10,6 @@ public interface AlgeManipulatorIO {
   class AlgeManipulatorIOInputs {
     // Indicates if the leader motor is connected
     public boolean leaderMotorConnected = true;
-    // Indicates if the follower motor is connected
-    public boolean followerMotorConnected = true;
 
     // Current position of the arm in radians from the primary encoder
     public double positionRads = 0.0;
@@ -20,13 +18,13 @@ public interface AlgeManipulatorIO {
     // Current velocity of the arm in radians per second
     public double velocityRadsPerSec = 0.0;
     // Array of voltages applied to the motors
-    public double[] appliedVolts = new double[] {};
+    public double appliedVolts = 0.0;
     // Array of supply currents in amps for the motors
-    public double[] supplyCurrentAmps = new double[] {};
+    public double supplyCurrentAmps = 0.0;
     // Array of torque currents in amps for the motors
-    public double[] torqueCurrentAmps = new double[] {};
+    public double torqueCurrentAmps = 0.0;
     // Array of temperatures in Celsius for the motors
-    public double[] tempCelcius = new double[] {};
+    public double tempCelcius = 0.0;
   }
 
   // Default method to update the ArmIOInputs; to be implemented by concrete classes

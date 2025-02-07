@@ -23,12 +23,10 @@ public final class AlgeManipulatorConstants {
   public static final Translation2d armOrigin = new Translation2d(0, 0); // FIXME ????
   public static final double kArmMass = 0.5; // Kilograms
   // Calculate the gear ratio for the arm based on multiple gear stages
-  public static final double kArmGearRatio = (42.0 / 12.0);
+  public static final double kArmGearRatio = (42.0 / 30.0) * (64 / 14);
 
   // Define the CAN ID for the leader motor controller
-  public static final int leaderID = 13;
-  // Define the CAN ID for the arm encoder
-  public static final int armEncoderID = 14;
+  public static final int leaderID = 16;
 
   // Specify whether the leader motor should be inverted
   public static final boolean leaderInverted = true;
@@ -43,7 +41,7 @@ public final class AlgeManipulatorConstants {
   // Define the motion constraints for the arm using trapezoidal profiling (max velocity and
   // acceleration)
   public static final TrapezoidProfile.Constraints kArmMotionConstraint =
-      new TrapezoidProfile.Constraints(20.0, 20.0);
+      new TrapezoidProfile.Constraints(40.0, 40.0);
 
   // Define the length of the arm in meters by converting from inches
   public static final double armLength = 0.305;
@@ -54,7 +52,7 @@ public final class AlgeManipulatorConstants {
           // In simulation mode, use higher kP and set other gains accordingly
         case SIM -> new Gains(7.5, 0.0, 0.0, 0.0, 0.07, 0.02, 0.2);
           // In real or replay modes, use different gains for actual hardware
-        case REAL, REPLAY -> new Gains(75.0, 0.0, 0, 0.0, 0.0, 0.0, 0.0);
+        case REAL, REPLAY -> new Gains(13, 0.0, 0, 0.25, 0.12, 0.01, 0.2);
       };
 
   // Define a record to hold the PID and feedforward gains

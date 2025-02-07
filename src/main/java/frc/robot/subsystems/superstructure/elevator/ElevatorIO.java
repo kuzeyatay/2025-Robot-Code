@@ -20,6 +20,8 @@ public interface ElevatorIO {
 
     // Current position of the elevator in meters
     public double positionMeters = 0.0;
+    public double leadPosition = 0.0;
+    public double followerPosition = 0.0;
 
     // Current velocity of the elevator in meters per second
     public double velocityMetersPerSecond = 0.0;

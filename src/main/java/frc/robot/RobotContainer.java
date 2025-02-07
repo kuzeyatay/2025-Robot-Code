@@ -14,6 +14,10 @@ import edu.wpi.first.wpilibj2.command.InstantCommand;
 import edu.wpi.first.wpilibj2.command.button.CommandXboxController;
 import frc.robot.commands.drive.DriveCommands;
 import frc.robot.subsystems.drive.*;
+import frc.robot.subsystems.superstructure.algeManipulator.AlgeManipulator;
+import frc.robot.subsystems.superstructure.algeManipulator.AlgeManipulatorIO;
+import frc.robot.subsystems.superstructure.algeManipulator.AlgeManipulatorIOKrakenFOC;
+import frc.robot.subsystems.superstructure.algeManipulator.AlgeManipulatorIOSim;
 import frc.robot.subsystems.superstructure.elevator.Elevator;
 import frc.robot.subsystems.superstructure.elevator.ElevatorIO;
 import frc.robot.subsystems.superstructure.elevator.ElevatorIOSim;
@@ -35,7 +39,8 @@ public class RobotContainer {
   private final Drive drive;
   public final Vision vision;
   private final Elevator elevator;
-  // ivate final AlgeManipulator algeManipulator;
+  private final AlgeManipulator algeManipulator;
+
   // ivate final CoralFlywheel coralFlywheel;
   // rivate final CoralWrist coralWrist;
   // ivate final Flywheels flywheels;
@@ -68,7 +73,8 @@ public class RobotContainer {
                 new VisionIOLimelight(VisionConstants.camera1Name, drive::getRotation));
 
         elevator = new Elevator(new ElevatorIOTalonFX());
-        // Manipulator = new AlgeManipulator(new AlgeManipulatorIOKrakenFOC());
+        algeManipulator = new AlgeManipulator(new AlgeManipulatorIOKrakenFOC());
+
         // oralWrist = new CoralWrist(new CoralWristIOKrakenFOC());
         // ralFlywheel = new CoralFlywheel(new CoralFlywheelIOSparkMax());
         // ywheels = new Flywheels(new FlywheelsIOSparkMax());
@@ -98,11 +104,13 @@ public class RobotContainer {
                     camera1Name, robotToCamera1, driveSimulation::getSimulatedDriveTrainPose));
 
         elevator = new Elevator(new ElevatorIOSim());
-        // geManipulator = new AlgeManipulator(new AlgeManipulatorIOSim());
+        algeManipulator = new AlgeManipulator(new AlgeManipulatorIOSim());
+
         // ralWrist = new CoralWrist(new CoralWristIOSim());
         // ralFlywheel = new CoralFlywheel(new CoralFlywheelIOSim());
         // ywheels = new Flywheels(new FlywheelsIOSim());
         // AIRobotInSimulation.startOpponentRobotSimulations();
+
         break;
 
       default:
@@ -116,7 +124,8 @@ public class RobotContainer {
                 new ModuleIO() {});
         vision = new Vision(drive, new VisionIO() {}, new VisionIO() {});
         elevator = new Elevator(new ElevatorIO() {});
-        // geManipulator = new AlgeManipulator(new AlgeManipulatorIO() {});
+        algeManipulator = new AlgeManipulator(new AlgeManipulatorIO() {});
+
         // ralWrist = new CoralWrist(new CoralWristIO() {});
         // ralFlywheel = new CoralFlywheel(new CoralFlywheelIO() {});
         // lywheels = new Flywheels(new FlywheelsIO() {});
@@ -166,18 +175,22 @@ public class RobotContainer {
                 () -> new Rotation2d(0)));
 
     // Elevator Test
-    controller.b().onTrue(new InstantCommand(() -> elevator.setGoal(Elevator.Goal.L2)));
-    controller.y().onTrue(new InstantCommand(() -> elevator.setGoal(Elevator.Goal.STOW)));
-    /*controller
-        .a()
-        .whileTrue(
-            Commands.startEnd(
-                () -> coralFlywheel.runVelocity(4000), coralFlywheel::stop, coralFlywheel));
+    controller.b().onTrue(elevator.homingSequence());
+    controller.y().onTrue(new InstantCommand(() -> elevator.setGoal(Elevator.Goal.L2)));
+    // controller
+    //  .a()
+    // .whileTrue(
+    //   Commands.startEnd(
+    //   () -> coralFlywheel.runVelocity(4000), coralFlywheel::stop, coralFlywheel));
     controller
-        .b()
+        .a()
+        .onTrue(new InstantCommand(() -> algeManipulator.setGoal(AlgeManipulator.Goal.STOW)));
+
+    controller
+        .x()
         .onTrue(new InstantCommand(() -> algeManipulator.setGoal(AlgeManipulator.Goal.PROCESSOR)));
 
-    controller.b().onTrue(new InstantCommand(() -> flywheels.intakeCommand()));*/
+    // controller.b().onTrue(new InstantCommand(() -> flywheels.intakeCommand()));
 
     /*ontroller
     .x()

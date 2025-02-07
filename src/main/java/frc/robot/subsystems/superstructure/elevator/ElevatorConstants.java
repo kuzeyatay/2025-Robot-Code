@@ -25,7 +25,7 @@ public class ElevatorConstants {
   // Indicates whether the follower motor is inverted
   public static final boolean followerInverted = false;
 
-  public static final double kElevatorMaxV = 10.0;
+  public static final double kElevatorMaxV = 12.0;
   // Defines the origin point of the elevator in 2D space; FIXME indicates it needs to be set
   // correctly
   public static final Translation2d elevatorOrigin = new Translation2d(100, 0); // FIXME ????
@@ -34,7 +34,7 @@ public class ElevatorConstants {
   public static final double kElevatorDrumRadius = Units.inchesToMeters(1.41 / 2.0);
 
   // FIXME Defines the mass of the elevator carriage in kilograms
-  public static final double kCarriageMass = 25.5; // kg
+  public static final double kCarriageMass = 15.5; // kg
 
   // Comment explaining that the encoder is zeroed at the bottom position, setting the minimum
   // height
@@ -49,7 +49,7 @@ public class ElevatorConstants {
   public static final Gains gains =
       switch (ModeSetter.currentMode) {
         case SIM -> new Gains(1000, 0.0, 2, 2.0, 9.29, 0.03, 0.19);
-        case REAL, REPLAY -> new Gains(10, .0, 0.0, 0.0, 9.29, 0.03, 0.19);
+        case REAL, REPLAY -> new Gains(22, .0, 0.1, 0.1, 9.29, 0.03, 15);
       };
 
   // Defines a record to hold the PID and feedforward gains for the elevator

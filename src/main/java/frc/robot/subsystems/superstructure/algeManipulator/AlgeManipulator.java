@@ -53,10 +53,6 @@ public class AlgeManipulator extends SubsystemBase {
           "Alge Manipulator/Acceleration",
           AlgeManipulatorConstants.kArmMotionConstraint.maxAcceleration);
 
-  // Define a tunable upper limit for partial stow in degrees
-  private static final LoggedTunableNumber partialStowUpperLimitDegrees =
-      new LoggedTunableNumber("Alge Manipulator/PartialStowUpperLimitDegrees", 30.0);
-
   // Define tunable lower and upper angle limits in degrees
   private static final LoggedTunableNumber lowerLimitDegrees =
       new LoggedTunableNumber(
@@ -99,7 +95,7 @@ public class AlgeManipulator extends SubsystemBase {
     // Define ANGLE1 goal with a tunable setpoint of 45 degrees
     GROUND_ALGE_INTAKE(new LoggedTunableNumber("Alge Manipulator/Ground intake for alge", 0.0)),
     L1(new LoggedTunableNumber("Alge Manipulator/L1", 0.0)),
-    PROCESSOR(new LoggedTunableNumber("Alge Manipulator/Processor", 75.0)),
+    PROCESSOR(new LoggedTunableNumber("Alge Manipulator/Processor", 50)),
     NET(new LoggedTunableNumber("Alge Manipulator/Net", 0.0)),
     EJECT(new LoggedTunableNumber("Alge Manipulator/Eject", 0.0)),
     SKYFALL(new LoggedTunableNumber("Alge Manipulator/Skyfall", 0.0)), // Drop alge from reef
@@ -188,7 +184,7 @@ public class AlgeManipulator extends SubsystemBase {
       return MathUtil.clamp(
           setpointState.position,
           Units.degreesToRadians(AlgeManipulatorConstants.minAngle),
-          Units.degreesToRadians(partialStowUpperLimitDegrees.get()));
+          Units.degreesToRadians(AlgeManipulatorConstants.maxAngle));
     } else {
       // Return the minimum angle in radians
       return Units.degreesToRadians(AlgeManipulatorConstants.minAngle);
@@ -261,17 +257,10 @@ public class AlgeManipulator extends SubsystemBase {
                       Units.degreesToRadians(upperLimitDegrees.get())),
                   0.0));
       // If stowing and at the minimum angle and at goal, stop the motor
-      if (goal == Goal.STOW
-          && EqualsUtil.epsilonEquals(
-              goalAngle, Units.degreesToRadians(AlgeManipulatorConstants.minAngle))
-          && atGoal()) {
-        io.stop();
-      } else {
 
-        // Run the setpoint with calculated feedforward
-        io.runSetpoint(
-            setpointState.position, ff.calculate(setpointState.position, setpointState.velocity));
-      }
+      // Run the setpoint with calculated feedforward
+      io.runSetpoint(
+          setpointState.position, ff.calculate(setpointState.position, setpointState.velocity));
 
       // Update the goal visualizer with the current goal angle
       goalVisualizer.update(goalAngle);

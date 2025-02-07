@@ -26,7 +26,6 @@ import edu.wpi.first.math.util.Units;
 import edu.wpi.first.units.measure.*;
 
 public class ElevatorIOTalonFX implements ElevatorIO {
-  public static final double reduction = 5.0;
 
   // Hardware
   private final TalonFX talon;
@@ -62,10 +61,10 @@ public class ElevatorIOTalonFX implements ElevatorIO {
     // Configure motor
     config.MotorOutput.NeutralMode = NeutralModeValue.Brake;
     config.Slot0 = new Slot0Configs().withKP(0).withKI(0).withKD(0);
-    config.Feedback.SensorToMechanismRatio = reduction;
-    config.TorqueCurrent.PeakForwardTorqueCurrent = 80.0;
+    config.Feedback.SensorToMechanismRatio = ElevatorConstants.elevatorGearRatio;
+    config.TorqueCurrent.PeakForwardTorqueCurrent = 120.0;
     config.TorqueCurrent.PeakReverseTorqueCurrent = -120;
-    config.CurrentLimits.StatorCurrentLimit = 80.0;
+    config.CurrentLimits.StatorCurrentLimit = 120.0;
     config.CurrentLimits.StatorCurrentLimitEnable = true;
     config.MotorOutput.Inverted = InvertedValue.Clockwise_Positive;
     tryUntilOk(5, () -> talon.getConfigurator().apply(config, 0.25));
@@ -96,6 +95,9 @@ public class ElevatorIOTalonFX implements ElevatorIO {
     inputs.positionMeters =
         Units.rotationsToRadians(position.getValueAsDouble())
             * ElevatorConstants.kElevatorDrumRadius;
+    inputs.leadPosition = talon.getPosition().getValueAsDouble();
+
+    inputs.followerPosition = followerTalon.getPosition().getValueAsDouble();
     inputs.velocityMetersPerSecond =
         Units.rotationsToRadians(velocity.getValueAsDouble())
             * ElevatorConstants.kElevatorDrumRadius;

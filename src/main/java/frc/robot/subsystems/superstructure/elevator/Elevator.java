@@ -4,8 +4,9 @@ import static frc.robot.subsystems.superstructure.elevator.ElevatorConstants.gai
 
 import edu.wpi.first.math.MathUtil;
 import edu.wpi.first.math.controller.ElevatorFeedforward;
-import edu.wpi.first.math.trajectory.ExponentialProfile;
-import edu.wpi.first.math.trajectory.ExponentialProfile.State;
+import edu.wpi.first.math.filter.Debouncer;
+import edu.wpi.first.math.trajectory.TrapezoidProfile;
+import edu.wpi.first.math.trajectory.TrapezoidProfile.State;
 import edu.wpi.first.wpilibj.Alert;
 import edu.wpi.first.wpilibj.DriverStation;
 import edu.wpi.first.wpilibj.Timer;
@@ -44,6 +45,26 @@ public class Elevator extends SubsystemBase {
   private static final LoggedTunableNumber kG =
       new LoggedTunableNumber("Elevator/Gains/kG", gains.ffkG());
 
+  private static final LoggedTunableNumber homingVolts =
+      new LoggedTunableNumber("Elevator/HomingVolts", -2.0);
+  private static final LoggedTunableNumber homingTimeSecs =
+      new LoggedTunableNumber("Elevator/HomingTimeSecs", 0.25);
+  private static final LoggedTunableNumber homingVelocityThresh =
+      new LoggedTunableNumber(
+          "Elevator/HomingVelocityThresh", 5.0 * ElevatorConstants.kElevatorDrumRadius);
+
+  private static final LoggedTunableNumber maxVelocityMetersPerSec =
+      new LoggedTunableNumber("Elevator/MaxVelocityMetersPerSec", 5);
+  private static final LoggedTunableNumber maxAccelerationMetersPerSec2 =
+      new LoggedTunableNumber("Elevator/MaxAccelerationMetersPerSec2", 20);
+
+  private Debouncer homingDebouncer = new Debouncer(homingTimeSecs.get());
+
+  @AutoLogOutput @Getter private boolean homed = true;
+
+  @AutoLogOutput(key = "Elevator/HomedPosition")
+  private double homedPosition = 0.045;
+
   private static final LoggedTunableNumber staticCharacterizationVelocityThresh =
       new LoggedTunableNumber("Elevator/StaticCharacterizationVelocityThresh", 0.0675);
 
@@ -53,10 +74,10 @@ public class Elevator extends SubsystemBase {
   // Suppliers to handle various override conditions
   private BooleanSupplier coastOverride = () -> false;
   private BooleanSupplier disabledOverride = DriverStation::isDisabled;
-  private final ExponentialProfile profile =
-      new ExponentialProfile(
-          ExponentialProfile.Constraints.fromCharacteristics(
-              ElevatorConstants.kElevatorMaxV, kV.getAsDouble(), kA.getAsDouble()));
+  private final TrapezoidProfile profile =
+      new TrapezoidProfile(
+          new TrapezoidProfile.Constraints(
+              maxVelocityMetersPerSec.get(), maxAccelerationMetersPerSec2.get()));
 
   @AutoLogOutput(key = "Elevator/BrakeModeEnabled")
   private boolean brakeModeEnabled = true;
@@ -74,7 +95,7 @@ public class Elevator extends SubsystemBase {
   public enum Goal {
     STOW(new LoggedTunableNumber("Elevator/STOW", 0.0)),
     L1(new LoggedTunableNumber("Elevator/L1", 0.0)),
-    L2(new LoggedTunableNumber("Elevator/L2", 0.8)),
+    L2(new LoggedTunableNumber("Elevator/L2", 0.3)),
     L3(new LoggedTunableNumber("Elevator/L3", 0.0)),
     L4(new LoggedTunableNumber("Elevator/L4", 0.0)),
     PROCESSOR(new LoggedTunableNumber("Elevator/PROCESSOR", 0.0)),
@@ -96,7 +117,8 @@ public class Elevator extends SubsystemBase {
   }
 
   public void setGoal(Goal goal) {
-    setGoal(() -> new State(goal.get(), 0.0));
+    stopProfile = false;
+    setGoal(() -> new State(goal.get() + homedPosition, 0.0));
   }
 
   public void setGoal(Supplier<State> goal) {
@@ -165,6 +187,10 @@ public class Elevator extends SubsystemBase {
     Logger.processInputs("Elevator", inputs);
     motorDisconnectedAlert.set(!(inputs.leaderMotorConnected && inputs.followerMotorConnected));
 
+    if (inputs.positionMeters == 0.3) {
+      io.stop();
+    }
+
     // Set coast mode
     setBrakeMode(!coastOverride.getAsBoolean());
 
@@ -183,7 +209,7 @@ public class Elevator extends SubsystemBase {
         kA);
 
     final boolean shouldRunProfile =
-        !stopProfile && !coastOverride.getAsBoolean() && !disabledOverride.getAsBoolean();
+        !stopProfile && !coastOverride.getAsBoolean() && !disabledOverride.getAsBoolean() && homed;
 
     Logger.recordOutput("Elevator/RunningProfile", shouldRunProfile);
 
@@ -199,7 +225,10 @@ public class Elevator extends SubsystemBase {
               0.0);
       setpoint = profile.calculate(0.02, setpoint, goalState);
       double feedforwardOutput = ff.calculateWithVelocities(setpoint.velocity, setpoint.velocity);
-      io.runPosition(setpoint.position, feedforwardOutput);
+      io.runPosition(
+          setpoint.position,
+          kS.get() * Math.signum(setpoint.velocity) // Magnitude irrelevant
+              + kG.get());
 
       // Log state
       // Log various elevator states for telemetry
@@ -241,6 +270,33 @@ public class Elevator extends SubsystemBase {
               stopProfile = false;
               timer.stop();
               Logger.recordOutput("Elevator/CharacterizationOutput", state.characterizationOutput);
+            });
+  }
+
+  public Command homingSequence() {
+    return Commands.startRun(
+            () -> {
+              stopProfile = true;
+              homed = false;
+              homingDebouncer = new Debouncer(homingTimeSecs.get());
+              homingDebouncer.calculate(false);
+            },
+            () -> {
+              if (disabledOverride.getAsBoolean() || coastOverride.getAsBoolean()) return;
+              io.runVolts(homingVolts.get());
+              homed =
+                  homingDebouncer.calculate(
+                      Math.abs(inputs.velocityMetersPerSecond) <= homingVelocityThresh.get());
+            })
+        .until(() -> homed)
+        .andThen(
+            () -> {
+              homedPosition = inputs.positionMeters;
+              homed = true;
+            })
+        .finallyDo(
+            () -> {
+              stopProfile = true;
             });
   }
 
