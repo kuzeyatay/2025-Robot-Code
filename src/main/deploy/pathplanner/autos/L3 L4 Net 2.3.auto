@@ -1,0 +1,91 @@
+{
+  "version": "2025.0",
+  "command": {
+    "type": "sequential",
+    "data": {
+      "commands": [
+        {
+          "type": "path",
+          "data": {
+            "pathName": "Start to Reef 2"
+          }
+        },
+        {
+          "type": "named",
+          "data": {
+            "name": "coralL3"
+          }
+        },
+        {
+          "type": "named",
+          "data": {
+            "name": "removeAlgae"
+          }
+        },
+        {
+          "type": "wait",
+          "data": {
+            "waitTime": 4.0
+          }
+        },
+        {
+          "type": "path",
+          "data": {
+            "pathName": "Reef to Net 1.3"
+          }
+        },
+        {
+          "type": "named",
+          "data": {
+            "name": "shootAlgae"
+          }
+        },
+        {
+          "type": "wait",
+          "data": {
+            "waitTime": 3.0
+          }
+        },
+        {
+          "type": "path",
+          "data": {
+            "pathName": "Net to Chute 3"
+          }
+        },
+        {
+          "type": "named",
+          "data": {
+            "name": "yumCoral"
+          }
+        },
+        {
+          "type": "wait",
+          "data": {
+            "waitTime": 3.0
+          }
+        },
+        {
+          "type": "path",
+          "data": {
+            "pathName": "Chute to Reef 1"
+          }
+        },
+        {
+          "type": "named",
+          "data": {
+            "name": "coralL4"
+          }
+        },
+        {
+          "type": "wait",
+          "data": {
+            "waitTime": 3.0
+          }
+        }
+      ]
+    }
+  },
+  "resetOdom": true,
+  "folder": "Nil K",
+  "choreoAuto": false
+}

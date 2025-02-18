@@ -62,11 +62,13 @@ public class ElevatorIOTalonFX implements ElevatorIO {
     config.MotorOutput.NeutralMode = NeutralModeValue.Brake;
     config.Slot0 = new Slot0Configs().withKP(0).withKI(0).withKD(0);
     config.Feedback.SensorToMechanismRatio = ElevatorConstants.elevatorGearRatio;
-    config.TorqueCurrent.PeakForwardTorqueCurrent = 120.0;
-    config.TorqueCurrent.PeakReverseTorqueCurrent = -120;
-    config.CurrentLimits.StatorCurrentLimit = 120.0;
+    config.TorqueCurrent.PeakForwardTorqueCurrent = 80.0;
+    config.TorqueCurrent.PeakReverseTorqueCurrent = -80;
+    config.CurrentLimits.StatorCurrentLimit = 80.0;
     config.CurrentLimits.StatorCurrentLimitEnable = true;
     config.MotorOutput.Inverted = InvertedValue.Clockwise_Positive;
+    config.MotorOutput.DutyCycleNeutralDeadband = 0.02;
+
     tryUntilOk(5, () -> talon.getConfigurator().apply(config, 0.25));
 
     position = talon.getPosition();
@@ -129,7 +131,8 @@ public class ElevatorIOTalonFX implements ElevatorIO {
         positionTorqueCurrentRequest
             .withPosition(
                 Units.radiansToRotations(positionRad / ElevatorConstants.kElevatorDrumRadius))
-            .withFeedForward(feedforward));
+            .withFeedForward(feedforward)
+            .withSlot(0));
   }
 
   @Override

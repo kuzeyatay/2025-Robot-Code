@@ -145,7 +145,7 @@ public class SysIdCommand extends Command {
     return false;
   }
 
-  /** SysId data for a drivetrain, returned by the subsystem. */
+  /** SysId data for a mechanism, returned by the subsystem. */
   public static class DriveTrainSysIdData {
     public final double leftPosRad;
     public final double rightPosRad;
@@ -155,7 +155,7 @@ public class SysIdCommand extends Command {
     public final double gyroVelRadPerSec;
 
     /**
-     * Creates a new DriveTrainSysIdData.
+     * Creates a new SysIdData.
      *
      * @param leftPosRad Left position (radians)
      * @param rightPosRad Right position (radians)

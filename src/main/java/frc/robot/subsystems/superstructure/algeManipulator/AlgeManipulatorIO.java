@@ -71,6 +71,10 @@ public interface AlgeManipulatorIO {
 
   default void runOpenLoop(double output) {}
 
+  default void runTorqueCurrent(double current) {}
+
   /** Default method to stop all arm motors immediately. */
   default void stop() {}
+
+  default void zero() {}
 }

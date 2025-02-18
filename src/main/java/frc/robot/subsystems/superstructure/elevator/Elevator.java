@@ -1,5 +1,6 @@
 package frc.robot.subsystems.superstructure.elevator;
 
+import static edu.wpi.first.units.Units.Volts;
 import static frc.robot.subsystems.superstructure.elevator.ElevatorConstants.gains;
 
 import edu.wpi.first.math.MathUtil;
@@ -13,8 +14,13 @@ import edu.wpi.first.wpilibj.Timer;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.Commands;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
+import edu.wpi.first.wpilibj2.command.sysid.SysIdRoutine;
 import frc.robot.util.EqualsUtil;
 import frc.robot.util.LoggedTunableNumber;
+import java.text.DecimalFormat;
+import java.text.NumberFormat;
+import java.util.LinkedList;
+import java.util.List;
 import java.util.function.BooleanSupplier;
 import java.util.function.DoubleSupplier;
 import java.util.function.Supplier;
@@ -28,7 +34,7 @@ import org.littletonrobotics.junction.Logger;
  * trapezoidal motion profiling for precise positioning.
  */
 public class Elevator extends SubsystemBase {
-
+  private final SysIdRoutine sysId;
   // Tunable PID and Feedforward gains for the elevator, allowing real-time adjustments
   private static final LoggedTunableNumber kP =
       new LoggedTunableNumber("Elevator/Gains/kP", gains.kP());
@@ -56,17 +62,17 @@ public class Elevator extends SubsystemBase {
   private static final LoggedTunableNumber maxVelocityMetersPerSec =
       new LoggedTunableNumber("Elevator/MaxVelocityMetersPerSec", 5);
   private static final LoggedTunableNumber maxAccelerationMetersPerSec2 =
-      new LoggedTunableNumber("Elevator/MaxAccelerationMetersPerSec2", 20);
+      new LoggedTunableNumber("Elevator/MaxAccelerationMetersPerSec2", 10);
 
   private Debouncer homingDebouncer = new Debouncer(homingTimeSecs.get());
 
   @AutoLogOutput @Getter private boolean homed = true;
 
   @AutoLogOutput(key = "Elevator/HomedPosition")
-  private double homedPosition = 0.045;
+  private double homedPosition = 0.0;
 
   private static final LoggedTunableNumber staticCharacterizationVelocityThresh =
-      new LoggedTunableNumber("Elevator/StaticCharacterizationVelocityThresh", 0.0675);
+      new LoggedTunableNumber("Elevator/StaticCharacterizationVelocityThresh", 0.04);
 
   private final Alert motorDisconnectedAlert =
       new Alert("Elevator motor disconnected!", Alert.AlertType.kWarning);
@@ -95,7 +101,7 @@ public class Elevator extends SubsystemBase {
   public enum Goal {
     STOW(new LoggedTunableNumber("Elevator/STOW", 0.0)),
     L1(new LoggedTunableNumber("Elevator/L1", 0.0)),
-    L2(new LoggedTunableNumber("Elevator/L2", 0.3)),
+    L2(new LoggedTunableNumber("Elevator/L2", 0.30)),
     L3(new LoggedTunableNumber("Elevator/L3", 0.0)),
     L4(new LoggedTunableNumber("Elevator/L4", 0.0)),
     PROCESSOR(new LoggedTunableNumber("Elevator/PROCESSOR", 0.0)),
@@ -118,7 +124,7 @@ public class Elevator extends SubsystemBase {
 
   public void setGoal(Goal goal) {
     stopProfile = false;
-    setGoal(() -> new State(goal.get() + homedPosition, 0.0));
+    setGoal(() -> new State(goal.get(), 0.0));
   }
 
   public void setGoal(Supplier<State> goal) {
@@ -152,6 +158,17 @@ public class Elevator extends SubsystemBase {
   public Elevator(ElevatorIO io) {
     this.io = io;
     io.setBrakeMode(true); // Engage brake mode by default
+
+    // Configure SysId
+    sysId =
+        new SysIdRoutine(
+            new SysIdRoutine.Config(
+                null,
+                null,
+                null,
+                (state) -> Logger.recordOutput("Elevator/SysIdState", state.toString())),
+            new SysIdRoutine.Mechanism(
+                (voltage) -> staticCharacterization(voltage.in(Volts)), null, this));
 
     // Set PID gains for the elevator
     io.setPID(kP.get(), kI.get(), kD.get());
@@ -291,16 +308,84 @@ public class Elevator extends SubsystemBase {
         .until(() -> homed)
         .andThen(
             () -> {
-              homedPosition = inputs.positionMeters;
               homed = true;
             })
         .finallyDo(
             () -> {
+              homedPosition = inputs.positionMeters;
               stopProfile = true;
             });
   }
 
   private static class StaticCharacterizationState {
     public double characterizationOutput = 0.0;
+  }
+
+  // In your Elevator class (or a separate characterization helper class) add:
+  public static Command feedforwardGravityCharacterization(Elevator elevator) {
+    // Constants for the characterization
+    final double GRAVITY_RAMP_RATE = 0.1; // Volts per second (adjust as needed)
+    final double GRAVITY_VELOCITY_THRESHOLD =
+        0.05; // m/s: threshold below which the elevator is considered stationary
+    final double SETTLE_TIME_SECONDS = 1.0; // Allow time for the mechanism to settle
+
+    // A list to collect voltage samples taken when the elevator is still nearly stationary
+    List<Double> voltageSamples = new LinkedList<>();
+    Timer timer = new Timer();
+
+    return Commands.sequence(
+        // 1. Clear any previous samples.
+        Commands.runOnce(
+            () -> {
+              voltageSamples.clear();
+            }),
+
+        // 2. Let the elevator settle (with zero voltage).
+        Commands.run(
+                () -> {
+                  elevator.io.runOpenLoop(0.0);
+                },
+                elevator)
+            .withTimeout(SETTLE_TIME_SECONDS),
+
+        // 3. Start the timer (this is our “ramp” clock).
+        Commands.runOnce(timer::restart),
+
+        // 4. Ramp the voltage open-loop and collect data.
+        //    The command will run until the measured velocity exceeds the threshold,
+        //    meaning the voltage is now high enough to move the elevator.
+        Commands.run(
+                () -> {
+                  // Compute a voltage that increases linearly with time.
+                  double voltage = timer.get() * GRAVITY_RAMP_RATE;
+                  // Command the elevator with this open-loop voltage.
+                  elevator.io.runOpenLoop(voltage);
+
+                  // If the elevator is nearly stationary, record this voltage.
+                  if (Math.abs(elevator.inputs.velocityMetersPerSecond)
+                      < GRAVITY_VELOCITY_THRESHOLD) {
+                    voltageSamples.add(voltage);
+                  }
+                },
+                elevator)
+            .until(() -> elevator.inputs.velocityMetersPerSecond > GRAVITY_VELOCITY_THRESHOLD)
+            .finallyDo(
+                () -> {
+                  // Stop the timer once the command ends.
+                  timer.stop();
+                  // Average all the collected voltage samples.
+                  int n = voltageSamples.size();
+                  double sum = 0.0;
+                  for (double v : voltageSamples) {
+                    sum += v;
+                  }
+                  double kG = n > 0 ? sum / n : 0.0;
+
+                  // Log the determined value.
+                  NumberFormat formatter = new DecimalFormat("#0.00000");
+                  System.out.println(
+                      "********** Elevator Gravity Characterization Results **********");
+                  System.out.println("\tkG: " + formatter.format(kG));
+                }));
   }
 }

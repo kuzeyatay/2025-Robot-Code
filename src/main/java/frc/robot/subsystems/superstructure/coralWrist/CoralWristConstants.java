@@ -23,12 +23,10 @@ public final class CoralWristConstants {
   public static final Translation2d armOrigin = new Translation2d(0, 0); // FIXME ????
 
   // Calculate the gear ratio for the arm based on multiple gear stages
-  public static final double kArmGearRatio = (62.0 / 12.0) * (60.0 / 18.0) * (65.0 / 12.0);
+  public static final double kArmGearRatio = (64.0 / 12.0) * (42 / 15);
 
   // Define the CAN ID for the leader motor controller
-  public static final int leaderID = 13;
-  // Define the CAN ID for the arm encoder
-  public static final int armEncoderID = 14;
+  public static final int leaderID = 15;
 
   // Specify whether the leader motor should be inverted
   public static final boolean leaderInverted = true;

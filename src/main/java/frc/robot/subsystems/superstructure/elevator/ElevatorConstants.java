@@ -49,7 +49,7 @@ public class ElevatorConstants {
   public static final Gains gains =
       switch (ModeSetter.currentMode) {
         case SIM -> new Gains(1000, 0.0, 2, 2.0, 9.29, 0.03, 0.19);
-        case REAL, REPLAY -> new Gains(22, .0, 0.1, 0.1, 9.29, 0.03, 15);
+        case REAL, REPLAY -> new Gains(770, .0, 70, 45, 9.29, 0.03, 7);
       };
 
   // Defines a record to hold the PID and feedforward gains for the elevator

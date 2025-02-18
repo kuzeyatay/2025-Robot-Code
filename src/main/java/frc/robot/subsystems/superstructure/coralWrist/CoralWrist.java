@@ -4,10 +4,13 @@ import static frc.robot.subsystems.superstructure.coralWrist.CoralWristConstants
 
 import edu.wpi.first.math.MathUtil;
 import edu.wpi.first.math.controller.ArmFeedforward;
+import edu.wpi.first.math.filter.Debouncer;
 import edu.wpi.first.math.trajectory.TrapezoidProfile;
 import edu.wpi.first.math.util.Units;
 import edu.wpi.first.wpilibj.DriverStation;
 import edu.wpi.first.wpilibj.util.Color;
+import edu.wpi.first.wpilibj2.command.Command;
+import edu.wpi.first.wpilibj2.command.Commands;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
 import frc.robot.ModeSetter;
 import frc.robot.ModeSetter.Mode;
@@ -58,6 +61,14 @@ public class CoralWrist extends SubsystemBase {
   private static final LoggedTunableNumber upperLimitDegrees =
       new LoggedTunableNumber("Coral Wrist/UpperLimitDegrees", CoralWristConstants.maxAngle);
 
+  private static final LoggedTunableNumber homingVolts =
+      new LoggedTunableNumber("Coral Wrist/HomingVolts", -1.0);
+  private static final LoggedTunableNumber homingTimeSecs =
+      new LoggedTunableNumber("Coral Wrist/HomingTimeSecs", 0.35);
+  private static final LoggedTunableNumber homingVelocityThresh =
+      new LoggedTunableNumber("Coral Wrist/ Homing Velocity Thresh", 0.1);
+
+  private Debouncer homingDebouncer = new Debouncer(homingTimeSecs.get());
   // Define suppliers to determine if the arm should be disabled, in coast mode, or half stowed
   private BooleanSupplier disableSupplier = DriverStation::isDisabled;
   public BooleanSupplier coastSupplier = () -> false;
@@ -121,7 +132,8 @@ public class CoralWrist extends SubsystemBase {
 
   // Flag to track if the arm was not in autonomous mode
   private boolean wasNotAuto = false;
-
+  public static double homedPosition = 0.0;
+  public static boolean homed = true;
   // Arm feedforward controller
   public ArmFeedforward ff;
 
@@ -271,5 +283,38 @@ public class CoralWrist extends SubsystemBase {
     Logger.recordOutput("Coral Wrist/SetpointVelocity", setpointState.velocity);
     Logger.recordOutput("Coral Wrist/currentDeg", Units.radiansToDegrees(inputs.positionRads));
     Logger.recordOutput("Coral Wrist/Goal", goal);
+  }
+
+  public Command homingSequence() {
+    return Commands.startRun(
+            () -> {
+              homingDebouncer = new Debouncer(homingTimeSecs.get());
+              homingDebouncer.calculate(false);
+            },
+            () -> {
+              io.runVolts(homingVolts.get());
+              homed =
+                  homingDebouncer.calculate(
+                      Math.abs(inputs.velocityRadsPerSec) <= homingVelocityThresh.get());
+            })
+        .until(() -> homed)
+        .andThen(
+            () -> {
+              homed = true;
+            })
+        .andThen(
+            () -> {
+              io.runSetpoint(homedPosition, 0.0);
+              homedPosition = inputs.positionRads;
+            })
+        .finallyDo(() -> io.zero());
+  }
+
+  public void setAngle(Goal goal) {
+    io.runSetpoint(goal.getRads() + goalAngle, 0);
+  }
+
+  public void setAngle(double goal) {
+    io.runSetpoint(Units.degreesToRadians(goal) + homedPosition, 0);
   }
 }

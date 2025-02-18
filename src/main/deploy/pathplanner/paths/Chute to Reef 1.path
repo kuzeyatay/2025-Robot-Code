@@ -1,0 +1,54 @@
+{
+  "version": "2025.0",
+  "waypoints": [
+    {
+      "anchor": {
+        "x": 1.4722500000000003,
+        "y": 7.0475
+      },
+      "prevControl": null,
+      "nextControl": {
+        "x": 2.418706086286595,
+        "y": 6.6959591679506945
+      },
+      "isLocked": false,
+      "linkedName": null
+    },
+    {
+      "anchor": {
+        "x": 3.8025,
+        "y": 5.18525
+      },
+      "prevControl": {
+        "x": 3.2751887519260396,
+        "y": 5.482707627118644
+      },
+      "nextControl": null,
+      "isLocked": false,
+      "linkedName": null
+    }
+  ],
+  "rotationTargets": [],
+  "constraintZones": [],
+  "pointTowardsZones": [],
+  "eventMarkers": [],
+  "globalConstraints": {
+    "maxVelocity": 3.0,
+    "maxAcceleration": 3.0,
+    "maxAngularVelocity": 540.0,
+    "maxAngularAcceleration": 720.0,
+    "nominalVoltage": 12.0,
+    "unlimited": false
+  },
+  "goalEndState": {
+    "velocity": 0,
+    "rotation": -61.630953706721414
+  },
+  "reversed": false,
+  "folder": "Nil K",
+  "idealStartingState": {
+    "velocity": 0,
+    "rotation": 127.17941102478201
+  },
+  "useDefaultConstraints": true
+}

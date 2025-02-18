@@ -1,10 +1,12 @@
 package frc.robot.subsystems.laserCan;
 
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
+import lombok.Getter;
 import org.littletonrobotics.junction.Logger;
 
 public class LaserCan extends SubsystemBase {
 
+  public int index;
   // IO interface for controlling and reading from the flywheel hardware
   private final LaserCanIO io;
   // Structure holding inputs from the FlywheelIO, automatically logged for telemetry
@@ -29,6 +31,6 @@ public class LaserCan extends SubsystemBase {
     // Process and log these inputs for debugging and telemetry
     Logger.processInputs(" laserCan", inputs);
   }
-  // Apply the configuration to the leader motor with retries (using SparkUtil's tryUntilOk)
 
+  @Getter public Double laserDistance = inputs.m_distance;
 }

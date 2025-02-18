@@ -52,7 +52,7 @@ public final class AlgeManipulatorConstants {
           // In simulation mode, use higher kP and set other gains accordingly
         case SIM -> new Gains(7.5, 0.0, 0.0, 0.0, 0.07, 0.02, 0.2);
           // In real or replay modes, use different gains for actual hardware
-        case REAL, REPLAY -> new Gains(13, 0.0, 0, 0.25, 0.12, 0.01, 0.2);
+        case REAL, REPLAY -> new Gains(25, 0.0, 0.5, 0.25, 0.06, 0.01, 0.3);
       };
 
   // Define a record to hold the PID and feedforward gains

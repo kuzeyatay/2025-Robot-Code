@@ -22,7 +22,7 @@ public class AlgeManipulatorIOKrakenFOC implements AlgeManipulatorIO {
 
   // Define the leader TalonFX motor controller with the leaderID from ArmConstants and connected to
   // the "rio" CAN bus
-  private final TalonFX leaderTalon;
+  private final TalonFX talon;
 
   // Status Signals
 
@@ -49,8 +49,10 @@ public class AlgeManipulatorIOKrakenFOC implements AlgeManipulatorIO {
   private final VoltageOut voltageControl =
       new VoltageOut(0.0).withEnableFOC(true).withUpdateFreqHz(0.0);
   private final TorqueCurrentFOC currentControl = new TorqueCurrentFOC(0.0).withUpdateFreqHz(0.0);
-  private final PositionTorqueCurrentFOC positionTorqueCurrentRequest =
-      new PositionTorqueCurrentFOC(0.0).withUpdateFreqHz(0.0);
+
+  // Control Requests
+  private final TorqueCurrentFOC torqueCurrentRequest =
+      new TorqueCurrentFOC(0.0).withUpdateFreqHz(0.0);
   // Configuration
 
   // Create a new TalonFX configuration object to hold various settings
@@ -59,14 +61,14 @@ public class AlgeManipulatorIOKrakenFOC implements AlgeManipulatorIO {
   // Constructor for the ArmIOKrakenFOC class
   public AlgeManipulatorIOKrakenFOC() {
     // Initialize the leader TalonFX motor controller with the specified CAN ID and CAN bus
-    leaderTalon = new TalonFX(AlgeManipulatorConstants.leaderID, "rio");
+    talon = new TalonFX(AlgeManipulatorConstants.leaderID, "rio");
 
     // Configure the leader TalonFX motor controller settings
 
     // Set the peak forward torque current to 80.0 amps
-    config.TorqueCurrent.PeakForwardTorqueCurrent = 120.0;
+    config.TorqueCurrent.PeakForwardTorqueCurrent = 80.0;
     // Set the peak reverse torque current to -80.0 amps
-    config.TorqueCurrent.PeakReverseTorqueCurrent = -120.0;
+    config.TorqueCurrent.PeakReverseTorqueCurrent = -80.0;
 
     // Configure motor output settings based on inversion from ArmConstants
     config.MotorOutput.Inverted =
@@ -79,26 +81,26 @@ public class AlgeManipulatorIOKrakenFOC implements AlgeManipulatorIO {
     config.Feedback.SensorToMechanismRatio = AlgeManipulatorConstants.kArmGearRatio;
     // Apply the TalonFX configuration to the leader Talon with a timeout of 1.0 seconds
     config.CurrentLimits.StatorCurrentLimitEnable = true;
-    tryUntilOk(5, () -> leaderTalon.getConfigurator().apply(config, 0.25));
+    tryUntilOk(5, () -> talon.getConfigurator().apply(config, 0.25));
 
     // Initialize Status Signals
 
-    leaderTalon.setPosition(0);
+    talon.setPosition(0);
 
     // Get the internal position from the leader TalonFX
-    internalPositionRotations = leaderTalon.getPosition();
+    internalPositionRotations = talon.getPosition();
     // Get the absolute encoder position from the CANcoder
 
     // Get the velocity in rotations per second from the leader TalonFX
-    velocityRps = leaderTalon.getVelocity();
+    velocityRps = talon.getVelocity();
     // Get the applied voltages to the motors from the leader TalonFX
-    appliedVoltage = leaderTalon.getMotorVoltage();
+    appliedVoltage = talon.getMotorVoltage();
     // Get the supply currents in amps from the leader TalonFX
-    supplyCurrent = leaderTalon.getSupplyCurrent();
+    supplyCurrent = talon.getSupplyCurrent();
     // Get the torque currents in amps from the leader TalonFX
-    torqueCurrent = leaderTalon.getTorqueCurrent();
+    torqueCurrent = talon.getTorqueCurrent();
     // Get the temperatures in Celsius from the leader TalonFX
-    tempCelsius = leaderTalon.getDeviceTemp();
+    tempCelsius = talon.getDeviceTemp();
 
     // Set the update frequency for various status signals to optimize data transmission
 
@@ -118,7 +120,7 @@ public class AlgeManipulatorIOKrakenFOC implements AlgeManipulatorIO {
     BaseStatusSignal.setUpdateFrequencyForAll(500, internalPositionRotations);
 
     // Optimize CAN bus utilization by scheduling message updates efficiently
-    leaderTalon.optimizeBusUtilization(0, 1.0);
+    talon.optimizeBusUtilization(0, 1.0);
 
     // Set Motion Magic control parameters
     // set slot 0 gains
@@ -134,11 +136,11 @@ public class AlgeManipulatorIOKrakenFOC implements AlgeManipulatorIO {
     // Retrieve the MotionMagic configuration from the TalonFX configuration
     var motionMagicConfigs = config.MotionMagic;
     // Set the cruise velocity for Motion Magic to 80 rotations per second
-    motionMagicConfigs.MotionMagicCruiseVelocity = 120; // Target cruise velocity of 80 rps
+    motionMagicConfigs.MotionMagicCruiseVelocity = 320; // Target cruise velocity of 80 rps
     // Set the acceleration for Motion Magic to 160 rotations per second squared (0.5 seconds to
     // reach target)
     motionMagicConfigs.MotionMagicCruiseVelocity = 0; // Unlimited cruise velocity
-    motionMagicConfigs.MotionMagicExpo_kV = 0.12; // kV is around 0.12 V/rps
+    motionMagicConfigs.MotionMagicExpo_kV = 0.42; // kV is around 0.12 V/rps
     motionMagicConfigs.MotionMagicExpo_kA = 0.1; // Use a slower kA of 0.1 V/(rps/s)
   }
 
@@ -182,10 +184,8 @@ public class AlgeManipulatorIOKrakenFOC implements AlgeManipulatorIO {
     // Set the control parameters: position (converted from radians to rotations), feedforward
     // voltage, and enable
     // FOC
-    leaderTalon.setControl(
-        request
-            .withPosition(Units.radiansToRotations(Units.degreesToRadians(50)))
-            .withFeedForward(feedforward));
+    talon.setControl(
+        request.withPosition(Units.radiansToRotations(setpointRads)).withFeedForward(feedforward));
   }
 
   // Override the runVolts method from the ArmIO interface to apply specific voltages to the arm
@@ -193,7 +193,7 @@ public class AlgeManipulatorIOKrakenFOC implements AlgeManipulatorIO {
   @Override
   public void runVolts(double volts) {
     // Apply the specified voltages using the predefined voltage control mode
-    leaderTalon.setControl(voltageControl.withOutput(volts));
+    talon.setControl(voltageControl.withOutput(volts));
   }
 
   // Override the runCurrent method from the ArmIO interface to apply specific currents to the arm
@@ -201,7 +201,7 @@ public class AlgeManipulatorIOKrakenFOC implements AlgeManipulatorIO {
   @Override
   public void runCurrent(double amps) {
     // Apply the specified currents using the predefined torque current control mode
-    leaderTalon.setControl(currentControl.withOutput(amps));
+    talon.setControl(currentControl.withOutput(amps));
   }
 
   // Override the setBrakeMode method from the ArmIO interface to enable or disable brake mode on
@@ -209,7 +209,7 @@ public class AlgeManipulatorIOKrakenFOC implements AlgeManipulatorIO {
   @Override
   public void setBrakeMode(boolean enabled) {
     // Set the neutral mode to Brake if enabled is true, otherwise set to Coast
-    leaderTalon.setNeutralMode(enabled ? NeutralModeValue.Brake : NeutralModeValue.Coast);
+    talon.setNeutralMode(enabled ? NeutralModeValue.Brake : NeutralModeValue.Coast);
   }
 
   // Override the setPID method from the ArmIO interface to update the PID controller gains
@@ -222,18 +222,29 @@ public class AlgeManipulatorIOKrakenFOC implements AlgeManipulatorIO {
     // Update the derivative gain in the configuration
     config.Slot0.kD = d;
     // Apply the updated configuration to the leader TalonFX with a timeout of 0.01 seconds
-    leaderTalon.getConfigurator().apply(config, 0.01);
+    talon.getConfigurator().apply(config, 0.01);
   }
 
   // Override the stop method from the ArmIO interface to immediately stop all arm motors
   @Override
   public void stop() {
     // Send a NeutralOut control command to stop the leader TalonFX motor
-    leaderTalon.stopMotor();
+    talon.stopMotor();
   }
 
   @Override
   public void runOpenLoop(double output) {
     runVolts(output);
+  }
+
+  @Override
+  public void zero() {
+
+    talon.setPosition(0);
+  }
+
+  @Override
+  public void runTorqueCurrent(double current) {
+    talon.setControl(torqueCurrentRequest.withOutput(current));
   }
 }

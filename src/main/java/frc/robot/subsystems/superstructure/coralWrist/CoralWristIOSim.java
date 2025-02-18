@@ -79,14 +79,14 @@ public class CoralWristIOSim implements CoralWristIO {
     // Update the velocity in radians per second
     inputs.velocityRadsPerSec = sim.getVelocityRadPerSec();
     // Update the applied voltages array with the current applied voltage
-    inputs.appliedVolts = new double[] {appliedVoltage};
+    inputs.appliedVolts = appliedVoltage;
     // Update the supply currents array with the simulated current draw in amps
-    inputs.supplyCurrentAmps = new double[] {sim.getCurrentDrawAmps()};
+    inputs.supplyCurrentAmps = sim.getCurrentDrawAmps();
     // Update the torque currents array with the simulated torque current draw in amps
-    inputs.torqueCurrentAmps = new double[] {sim.getCurrentDrawAmps()};
+    inputs.torqueCurrentAmps = sim.getCurrentDrawAmps();
     // Update the temperatures array with a fixed value of 0.0 Celsius (no simulation of
     // temperature)
-    inputs.tempCelcius = new double[] {0.0};
+    inputs.tempCelcius = 0.0;
 
     // Reset the input voltage to 0.0 volts after applying it to the simulation
     sim.setInputVoltage(0.0);

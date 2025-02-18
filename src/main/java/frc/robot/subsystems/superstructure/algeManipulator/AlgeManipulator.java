@@ -5,11 +5,13 @@ import static frc.robot.subsystems.superstructure.algeManipulator.AlgeManipulato
 
 import edu.wpi.first.math.MathUtil;
 import edu.wpi.first.math.controller.ArmFeedforward;
+import edu.wpi.first.math.filter.Debouncer;
 import edu.wpi.first.math.trajectory.TrapezoidProfile;
 import edu.wpi.first.math.util.Units;
 import edu.wpi.first.wpilibj.DriverStation;
 import edu.wpi.first.wpilibj.util.Color;
 import edu.wpi.first.wpilibj2.command.Command;
+import edu.wpi.first.wpilibj2.command.Commands;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
 import edu.wpi.first.wpilibj2.command.sysid.SysIdRoutine;
 import frc.robot.ModeSetter;
@@ -29,6 +31,7 @@ public class AlgeManipulator extends SubsystemBase {
 
   // Define tunable PID and feedforward constants with default values from
   // AlgeManipulatorConstants.gains
+  @AutoLogOutput @Getter private boolean homed = true;
   private static final LoggedTunableNumber kP =
       new LoggedTunableNumber("Alge Manipulator/Gains/kP", gains.kP());
   private static final LoggedTunableNumber kI =
@@ -43,6 +46,13 @@ public class AlgeManipulator extends SubsystemBase {
       new LoggedTunableNumber("Alge Manipulator/Gains/kA", gains.ffkA());
   private static final LoggedTunableNumber kG =
       new LoggedTunableNumber("Alge Manipulator/Gains/kG", gains.ffkG());
+  private static final LoggedTunableNumber homingVolts =
+      new LoggedTunableNumber("Alge Manipulatorr/HomingVolts", -1.0);
+  private static final LoggedTunableNumber homingTimeSecs =
+      new LoggedTunableNumber("Alge Manipulator/HomingTimeSecs", 0.35);
+  private static final LoggedTunableNumber homingVelocityThresh =
+      new LoggedTunableNumber("Alge Manipulator", 0.1);
+  private Debouncer homingDebouncer = new Debouncer(homingTimeSecs.get());
 
   // Define tunable maximum velocity and acceleration for arm motion constraints
   private static final LoggedTunableNumber maxVelocity =
@@ -61,12 +71,27 @@ public class AlgeManipulator extends SubsystemBase {
       new LoggedTunableNumber(
           "Alge Manipulator/UpperLimitDegrees", AlgeManipulatorConstants.maxAngle);
 
+  private static final LoggedTunableNumber slamUpCurrent =
+      new LoggedTunableNumber("Slam/SlamUpCurrent", -40.0);
+
   // Define suppliers to determine if the arm should be disabled, in coast mode, or half stowed
   private BooleanSupplier disableSupplier = DriverStation::isDisabled;
   public BooleanSupplier coastSupplier = () -> false;
   private BooleanSupplier halfStowSupplier = () -> true;
   // Flag to indicate if brake mode is enabled
   private boolean brakeModeEnabled = true;
+
+  public static double homedPosition = 0.0;
+
+  @Getter
+  @RequiredArgsConstructor
+  public enum Goaly {
+    IDLE(() -> 0.0, false),
+    SLAM_UP(slamUpCurrent, true);
+
+    private final DoubleSupplier slamCurrent;
+    private final boolean retracted;
+  }
 
   // Flag to indicate if the arm is in characterization mode
   private boolean characterizing = false;
@@ -91,11 +116,11 @@ public class AlgeManipulator extends SubsystemBase {
   @RequiredArgsConstructor
   public enum Goal {
     // Define the STOW goal with an angle of 0 degrees
-    STOW(() -> 0),
+    STOW(() -> -3),
     // Define ANGLE1 goal with a tunable setpoint of 45 degrees
     GROUND_ALGE_INTAKE(new LoggedTunableNumber("Alge Manipulator/Ground intake for alge", 0.0)),
     L1(new LoggedTunableNumber("Alge Manipulator/L1", 0.0)),
-    PROCESSOR(new LoggedTunableNumber("Alge Manipulator/Processor", 50)),
+    PROCESSOR(new LoggedTunableNumber("Alge Manipulator/Processor", 95)),
     NET(new LoggedTunableNumber("Alge Manipulator/Net", 0.0)),
     EJECT(new LoggedTunableNumber("Alge Manipulator/Eject", 0.0)),
     SKYFALL(new LoggedTunableNumber("Alge Manipulator/Skyfall", 0.0)), // Drop alge from reef
@@ -141,7 +166,10 @@ public class AlgeManipulator extends SubsystemBase {
 
   // Constructor for the Arm class, initializing IO and controllers
   public AlgeManipulator(AlgeManipulatorIO io) {
+    io.zero();
     this.io = io;
+
+    setAngle(homedPosition);
     // Set brake mode to enabled initially
     io.setBrakeMode(true);
     // Initialize the motion profile with current max velocity and acceleration
@@ -259,8 +287,6 @@ public class AlgeManipulator extends SubsystemBase {
       // If stowing and at the minimum angle and at goal, stop the motor
 
       // Run the setpoint with calculated feedforward
-      io.runSetpoint(
-          setpointState.position, ff.calculate(setpointState.position, setpointState.velocity));
 
       // Update the goal visualizer with the current goal angle
       goalVisualizer.update(goalAngle);
@@ -319,5 +345,61 @@ public class AlgeManipulator extends SubsystemBase {
         .andThen(
             sysIdQuasistatic(SysIdRoutine.Direction.kForward)
                 .until(() -> motorHasReachedBackwardsLimit()));
+  }
+
+  public void setAngle(Goal goal) {
+    io.runSetpoint(goal.getRads() + goalAngle, 0);
+  }
+
+  public void setAngle(double goal) {
+    io.runSetpoint(Units.degreesToRadians(goal) + homedPosition, 0);
+  }
+
+  public Command homingSequence() {
+    return Commands.startRun(
+            () -> {
+              homingDebouncer = new Debouncer(homingTimeSecs.get());
+              homingDebouncer.calculate(false);
+            },
+            () -> {
+              io.runVolts(homingVolts.get());
+              homed =
+                  homingDebouncer.calculate(
+                      Math.abs(inputs.velocityRadsPerSec) <= homingVelocityThresh.get());
+            })
+        .until(() -> homed)
+        .andThen(
+            () -> {
+              homed = true;
+            })
+        .andThen(
+            () -> {
+              io.runSetpoint(homedPosition, 0.0);
+              homedPosition = inputs.positionRads;
+            })
+        .finallyDo(() -> io.zero());
+  }
+
+  public Command slamUp() {
+    return Commands.startRun(
+            () -> {
+              io.runTorqueCurrent(slamUpCurrent.getAsDouble());
+            },
+            () -> {
+              homed =
+                  homingDebouncer.calculate(
+                      Math.abs(inputs.velocityRadsPerSec) <= homingVelocityThresh.get());
+              homedPosition = inputs.positionRads;
+            })
+        .until(() -> homed)
+        .andThen(
+            () -> {
+              homed = true;
+            })
+        .finallyDo(
+            () -> {
+              io.zero();
+              io.stop();
+            });
   }
 }

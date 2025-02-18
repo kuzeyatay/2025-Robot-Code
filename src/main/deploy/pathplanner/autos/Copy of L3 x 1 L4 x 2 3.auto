@@ -1,0 +1,103 @@
+{
+  "version": "2025.0",
+  "command": {
+    "type": "sequential",
+    "data": {
+      "commands": [
+        {
+          "type": "path",
+          "data": {
+            "pathName": "Start to Reef 3.2"
+          }
+        },
+        {
+          "type": "wait",
+          "data": {
+            "waitTime": 2.5
+          }
+        },
+        {
+          "type": "named",
+          "data": {
+            "name": "coralL3"
+          }
+        },
+        {
+          "type": "path",
+          "data": {
+            "pathName": "Reef to Chute 2"
+          }
+        },
+        {
+          "type": "wait",
+          "data": {
+            "waitTime": 2.5
+          }
+        },
+        {
+          "type": "named",
+          "data": {
+            "name": "yumCoral"
+          }
+        },
+        {
+          "type": "path",
+          "data": {
+            "pathName": "Chute to Reef 1"
+          }
+        },
+        {
+          "type": "wait",
+          "data": {
+            "waitTime": 2.5
+          }
+        },
+        {
+          "type": "named",
+          "data": {
+            "name": "coralL4"
+          }
+        },
+        {
+          "type": "path",
+          "data": {
+            "pathName": "Reef to Chute 1"
+          }
+        },
+        {
+          "type": "wait",
+          "data": {
+            "waitTime": 2.5
+          }
+        },
+        {
+          "type": "named",
+          "data": {
+            "name": "yumCoral"
+          }
+        },
+        {
+          "type": "path",
+          "data": {
+            "pathName": "Chute to Reef 1"
+          }
+        },
+        {
+          "type": "wait",
+          "data": {
+            "waitTime": 2.5
+          }
+        },
+        {
+          "type": "named",
+          "data": {
+            "name": "coralL4"
+          }
+        }
+      ]
+    }
+  },
+  "resetOdom": true,
+  "folder": "Nil K",
+  "choreoAuto": false
+}
