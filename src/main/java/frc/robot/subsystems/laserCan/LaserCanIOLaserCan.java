@@ -22,7 +22,12 @@ public class LaserCanIOLaserCan implements LaserCanIO {
 
   @Override
   public void updateInputs(LaserCanIOInputs inputs) {
+
     LaserCan.Measurement m_dis = lasercan.getMeasurement();
-    inputs.m_distance = m_dis.distance_mm;
+    if (m_dis != null) {
+      inputs.m_distance = m_dis.distance_mm;
+    } else {
+      inputs.m_distance = 100;
+    }
   }
 }

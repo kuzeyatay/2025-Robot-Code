@@ -1,7 +1,8 @@
 package frc.robot.subsystems.laserCan;
 
-import au.grapplerobotics.ConfigurationFailedException;
-import au.grapplerobotics.interfaces.LaserCanInterface;
+import au.grapplerobotics.interfaces.LaserCanInterface.Measurement;
+import au.grapplerobotics.interfaces.LaserCanInterface.RegionOfInterest;
+import au.grapplerobotics.interfaces.LaserCanInterface.TimingBudget;
 import edu.wpi.first.hal.SimBoolean;
 import edu.wpi.first.hal.SimDevice;
 import edu.wpi.first.hal.SimDevice.Direction;
@@ -9,7 +10,7 @@ import edu.wpi.first.hal.SimDeviceJNI;
 import edu.wpi.first.hal.SimEnum;
 import edu.wpi.first.hal.SimInt;
 
-public class LaserCanIOSim implements LaserCanInterface {
+public class LaserCanIOSim implements LaserCanIO {
 
   private final SimDevice simDevice;
   private final SimEnum m_status;
@@ -27,7 +28,7 @@ public class LaserCanIOSim implements LaserCanInterface {
    * @param can_id The CAN ID for the LaserCAN sensor. This ID is unique, and set in GrappleHook.
    *     Note: one ID should be mapped to only one sensor, or else measurements will conflict.
    */
-  public LaserCanIOSim(int can_id) {
+  public LaserCanIOSim() {
     _measurement =
         new Measurement(
             0,
@@ -37,7 +38,7 @@ public class LaserCanIOSim implements LaserCanInterface {
             TimingBudget.TIMING_BUDGET_20MS.asMilliseconds(),
             new RegionOfInterest(0, 0, 16, 16));
 
-    simDevice = new SimDevice(SimDeviceJNI.createSimDevice("LaserCAN [" + can_id + "]"));
+    simDevice = new SimDevice(SimDeviceJNI.createSimDevice("LaserCAN "));
     m_distancemm = simDevice.createInt("distance_mm", Direction.kBidir, _measurement.distance_mm);
     m_ambient = simDevice.createInt("ambient", Direction.kBidir, _measurement.ambient);
     m_islong = simDevice.createBoolean("is_long", Direction.kOutput, _measurement.is_long);
@@ -66,59 +67,6 @@ public class LaserCanIOSim implements LaserCanInterface {
     m_roiY = simDevice.createInt("ROI Y", Direction.kOutput, _measurement.roi.y);
     m_roiW = simDevice.createInt("ROI W", Direction.kOutput, _measurement.roi.w);
     m_roiH = simDevice.createInt("ROI H", Direction.kOutput, _measurement.roi.h);
-  }
-
-  /** Get the most recent measurement from the sensor, if available. May return null. */
-  @Override
-  public Measurement getMeasurement() {
-    _measurement.ambient = m_ambient.get();
-    _measurement.distance_mm = m_distancemm.get();
-    _measurement.is_long = m_islong.get();
-    _measurement.status = m_status.get();
-    _measurement.roi.x = m_roiX.get();
-    _measurement.roi.y = m_roiY.get();
-    _measurement.roi.w = m_roiW.get();
-    _measurement.roi.h = m_roiH.get();
-    return _measurement;
-  }
-
-  /**
-   * Set the ranging mode for the sensor.
-   *
-   * @param mode
-   * @see RangingMode
-   */
-  @Override
-  public void setRangingMode(RangingMode mode) throws ConfigurationFailedException {
-    _measurement.is_long = mode == RangingMode.LONG;
-    m_islong.set(mode == RangingMode.LONG);
-  }
-
-  /**
-   * Set the timing budget for the sensor.
-   *
-   * @param budget
-   * @see TimingBudget
-   */
-  @Override
-  public void setTimingBudget(TimingBudget budget) throws ConfigurationFailedException {
-    _measurement.budget_ms = budget.asMilliseconds();
-    m_timingBudget.set(budget.ordinal());
-  }
-
-  /**
-   * Set the region of interest for the sensor.
-   *
-   * @param roi
-   * @see RegionOfInterest
-   */
-  @Override
-  public void setRegionOfInterest(RegionOfInterest roi) throws ConfigurationFailedException {
-    _measurement.roi = roi;
-    m_roiX.set(roi.x);
-    m_roiY.set(roi.y);
-    m_roiW.set(roi.w);
-    m_roiH.set(roi.h);
   }
 
   public void setMeasurementFullSim(Measurement measurement) {

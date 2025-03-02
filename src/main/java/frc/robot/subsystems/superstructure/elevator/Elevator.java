@@ -5,9 +5,11 @@ import static frc.robot.subsystems.superstructure.elevator.ElevatorConstants.gai
 
 import edu.wpi.first.math.MathUtil;
 import edu.wpi.first.math.controller.ElevatorFeedforward;
+import edu.wpi.first.math.controller.SimpleMotorFeedforward;
 import edu.wpi.first.math.filter.Debouncer;
 import edu.wpi.first.math.trajectory.TrapezoidProfile;
 import edu.wpi.first.math.trajectory.TrapezoidProfile.State;
+import edu.wpi.first.math.util.Units;
 import edu.wpi.first.wpilibj.Alert;
 import edu.wpi.first.wpilibj.DriverStation;
 import edu.wpi.first.wpilibj.Timer;
@@ -15,12 +17,12 @@ import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.Commands;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
 import edu.wpi.first.wpilibj2.command.sysid.SysIdRoutine;
+import frc.robot.FieldConstants.ReefLevel;
+import frc.robot.ModeSetter;
+import frc.robot.subsystems.genericFlywheels.GenericFlywheelsIO;
+import frc.robot.subsystems.genericFlywheels.GenericFlywheelsIOInputsAutoLogged;
 import frc.robot.util.EqualsUtil;
 import frc.robot.util.LoggedTunableNumber;
-import java.text.DecimalFormat;
-import java.text.NumberFormat;
-import java.util.LinkedList;
-import java.util.List;
 import java.util.function.BooleanSupplier;
 import java.util.function.DoubleSupplier;
 import java.util.function.Supplier;
@@ -32,6 +34,8 @@ import org.littletonrobotics.junction.Logger;
 /**
  * Elevator subsystem that controls the robot's elevator mechanism. Utilizes PID control and
  * trapezoidal motion profiling for precise positioning.
+ *
+ * @param <GenericFlywheelsIO>
  */
 public class Elevator extends SubsystemBase {
   private final SysIdRoutine sysId;
@@ -62,7 +66,10 @@ public class Elevator extends SubsystemBase {
   private static final LoggedTunableNumber maxVelocityMetersPerSec =
       new LoggedTunableNumber("Elevator/MaxVelocityMetersPerSec", 5);
   private static final LoggedTunableNumber maxAccelerationMetersPerSec2 =
-      new LoggedTunableNumber("Elevator/MaxAccelerationMetersPerSec2", 10);
+      new LoggedTunableNumber("Elevator/MaxAccelerationMetersPerSec2", 4);
+
+  // A debouncer to delay downward movements
+  private final Debouncer downDebouncer = new Debouncer(0.5);
 
   private Debouncer homingDebouncer = new Debouncer(homingTimeSecs.get());
 
@@ -92,6 +99,25 @@ public class Elevator extends SubsystemBase {
   private Supplier<State> goal = State::new;
   private boolean stopProfile = false;
 
+  @AutoLogOutput(key = "Elevator/isDebouncerNeeded")
+  public boolean isDebouncerNeeded = false;
+
+  private double previousGoalPosition = 0.0;
+  public double currentGoalPosition = 0.0;
+
+  // IO interface for controlling and reading from the flywheel hardware
+  private final GenericFlywheelsIO bottomFlywheelsIO;
+  private final GenericFlywheelsIO topFlywheelsIO;
+  // Structure holding inputs from the FlywheelIO, automatically logged for telemetry
+  private final GenericFlywheelsIOInputsAutoLogged bottomFlywheelsInputs =
+      new GenericFlywheelsIOInputsAutoLogged();
+  private final GenericFlywheelsIOInputsAutoLogged topFlywheelsInputs =
+      new GenericFlywheelsIOInputsAutoLogged();
+
+  // A feedforward model for the flywheel's motor(s), used in closed-loop control
+  private final SimpleMotorFeedforward bottomFlywheelsFFModel;
+  private final SimpleMotorFeedforward topFlywheelsFFModel;
+
   /**
    * Enum representing predefined goal positions for the elevator. Each goal has an associated
    * height supplier.
@@ -100,12 +126,20 @@ public class Elevator extends SubsystemBase {
   // FIXME
   public enum Goal {
     STOW(new LoggedTunableNumber("Elevator/STOW", 0.0)),
+    CHUTE(new LoggedTunableNumber("Elevator/CHUTE", 0.12)),
     L1(new LoggedTunableNumber("Elevator/L1", 0.0)),
-    L2(new LoggedTunableNumber("Elevator/L2", 0.30)),
-    L3(new LoggedTunableNumber("Elevator/L3", 0.0)),
-    L4(new LoggedTunableNumber("Elevator/L4", 0.0)),
+    L2(new LoggedTunableNumber("Elevator/L2", 0)),
+    LIMBO_1(
+        new LoggedTunableNumber(
+            "Elevator/L2_L3",
+            ReefLevel.L2.height + 0.3 + ((ReefLevel.L3.height - ReefLevel.L2.height) / 2))),
+    L3(new LoggedTunableNumber("Elevator/L3", ReefLevel.L3.height)),
+    L4(new LoggedTunableNumber("Elevator/L4", 1.2)),
+    LIMBO_2(
+        new LoggedTunableNumber(
+            "Elevator/L3_L4", ReefLevel.L3.height + 0.17 + ((1.2 - ReefLevel.L3.height) / 2))),
     PROCESSOR(new LoggedTunableNumber("Elevator/PROCESSOR", 0.0)),
-    NET(new LoggedTunableNumber("Elevator/NET", 0.0)),
+    NET(new LoggedTunableNumber("Elevator/NET", 1.29)),
     EJECT(new LoggedTunableNumber("Elevator/EJECT", 0.0)),
     CA(new LoggedTunableNumber("Elevator/Coral on top of alge", 0.0));
 
@@ -117,14 +151,56 @@ public class Elevator extends SubsystemBase {
      *
      * @return The height in meters.
      */
-    private double get() {
+    public double get() {
       return elevatorSetpointSupplier.getAsDouble();
+    }
+  }
+
+  @RequiredArgsConstructor
+  public enum flywheelGoal {
+    // Define the STOW goal with an angle of 0 degrees
+    STOW(() -> 0, () -> 0),
+    // Define ANGLE1 goal with a tunable setpoint of 45 degrees
+    INTAKE(
+        new LoggedTunableNumber("Top Elevator Flywheel/Intake", -2000),
+        new LoggedTunableNumber("Bottom Elevator Flywheel/Intake", 2000)),
+    NET(
+        new LoggedTunableNumber("Top Elevator Flywheel/Eject", 3000),
+        new LoggedTunableNumber("Bottom Elevator Flywheel/Eject", -3000)),
+    EJECT(
+        new LoggedTunableNumber("Top Elevator Flywheel/Eject", 3000),
+        new LoggedTunableNumber("Bottom Elevator Flywheel/Eject", -3000));
+
+    // Supplier to provide the arm setpoint in degrees
+    private final DoubleSupplier topFlywheelRPM;
+    // Supplier to provide the arm setpoint in degrees
+    private final DoubleSupplier bottomFlywheelRPM;
+
+    // Method to get the setpoint in radians
+    public DoubleSupplier getTopRPM() {
+      return topFlywheelRPM;
+    }
+    // Method to get the setpoint in radians
+    public DoubleSupplier getBottomRPM() {
+      return bottomFlywheelRPM;
     }
   }
 
   public void setGoal(Goal goal) {
     stopProfile = false;
-    setGoal(() -> new State(goal.get(), 0.0));
+    double newGoalPosition = goal.get();
+    if (newGoalPosition > previousGoalPosition) {
+      // New goal is higher than the previous goal.
+      isDebouncerNeeded = false;
+    } else if (newGoalPosition < previousGoalPosition) {
+      // New goal is lower than the previous goal.
+      isDebouncerNeeded = true;
+    } else {
+      isDebouncerNeeded = false;
+    }
+    previousGoalPosition = newGoalPosition; // Update for next comparison. if ve ever need these
+    currentGoalPosition = newGoalPosition;
+    setGoal(() -> new State(newGoalPosition, 0.0));
   }
 
   public void setGoal(Supplier<State> goal) {
@@ -138,7 +214,8 @@ public class Elevator extends SubsystemBase {
    */
   @AutoLogOutput(key = "Elevator/AtGoal")
   public boolean atGoal() {
-    return EqualsUtil.epsilonEquals(setpoint.position, goal.get().position, 1e-3);
+    if (EqualsUtil.epsilonEquals(setpoint.position, 0, 1e-3)) return false;
+    else return EqualsUtil.epsilonEquals(inputs.positionMeters, goal.get().position, 0.05);
   }
 
   // Current goal of the elevator, with getter and setter
@@ -155,8 +232,11 @@ public class Elevator extends SubsystemBase {
    *
    * @param io An implementation of the ElevatorIO interface to interact with hardware.
    */
-  public Elevator(ElevatorIO io) {
+  public Elevator(
+      ElevatorIO io, GenericFlywheelsIO bottomFlywheelsIO, GenericFlywheelsIO topFlywheelsIO) {
     this.io = io;
+    this.bottomFlywheelsIO = bottomFlywheelsIO;
+    this.topFlywheelsIO = topFlywheelsIO;
     io.setBrakeMode(true); // Engage brake mode by default
 
     // Configure SysId
@@ -175,6 +255,40 @@ public class Elevator extends SubsystemBase {
 
     // Initialize the feedforward controller with current gains
     ff = new ElevatorFeedforward(kS.get(), kG.get(), kV.get(), kA.get());
+
+    // Flywheels
+
+    // Configure PID and feedforward gains based on the robot's current mode
+    // The simulation mode may require different tuning than the real hardware
+    switch (ModeSetter.currentMode) {
+      case REAL:
+        bottomFlywheelsFFModel = new SimpleMotorFeedforward(0.0001, 0.000195, 0.0003);
+        bottomFlywheelsIO.configurePID(0.8, 0.0, 0.0);
+        topFlywheelsFFModel = new SimpleMotorFeedforward(0.0001, 0.000195, 0.0003);
+        topFlywheelsIO.configurePID(0.8, 0.0, 0.0);
+        break;
+      case REPLAY:
+        // On real hardware or replay mode, use these gains
+        bottomFlywheelsFFModel = new SimpleMotorFeedforward(0.0001, 0.000195, 0.0003);
+        bottomFlywheelsIO.configurePID(1.0, 0.0, 0.0);
+        topFlywheelsFFModel = new SimpleMotorFeedforward(0.0001, 0.000195, 0.0003);
+        topFlywheelsIO.configurePID(1.0, 0.0, 0.0);
+        break;
+      case SIM:
+        // In simulation, use different feedforward and PID gains to achieve stable behavior in the
+        // model
+        bottomFlywheelsFFModel = new SimpleMotorFeedforward(0.01, 0.00103, 0.0);
+        bottomFlywheelsIO.configurePID(0.4, 0.0, 0.0);
+        topFlywheelsFFModel = new SimpleMotorFeedforward(0.01, 0.00103, 0.0);
+        topFlywheelsIO.configurePID(0.4, 0.0, 0.0);
+        break;
+      default:
+        bottomFlywheelsFFModel = new SimpleMotorFeedforward(0.01, 0.00103, 0.0);
+        bottomFlywheelsIO.configurePID(0.4, 0.0, 0.0);
+        topFlywheelsFFModel = new SimpleMotorFeedforward(0.01, 0.00103, 0.0);
+        topFlywheelsIO.configurePID(0.4, 0.0, 0.0);
+        break;
+    }
   }
 
   public void setOverrides(BooleanSupplier coastOverride, BooleanSupplier disabledOverride) {
@@ -204,9 +318,15 @@ public class Elevator extends SubsystemBase {
     Logger.processInputs("Elevator", inputs);
     motorDisconnectedAlert.set(!(inputs.leaderMotorConnected && inputs.followerMotorConnected));
 
-    if (inputs.positionMeters == 0.3) {
-      io.stop();
-    }
+    // Update inputs from the hardware implementation
+    bottomFlywheelsIO.updateInputs(bottomFlywheelsInputs);
+    // Process and log these inputs for debugging and telemetry
+    Logger.processInputs("Bottom Elevator Flywheel", bottomFlywheelsInputs);
+
+    // Update inputs from the hardware implementation
+    topFlywheelsIO.updateInputs(topFlywheelsInputs);
+    // Process and log these inputs for debugging and telemetry
+    Logger.processInputs("Top Elevator Flywheel", topFlywheelsInputs);
 
     // Set coast mode
     setBrakeMode(!coastOverride.getAsBoolean());
@@ -240,7 +360,18 @@ public class Elevator extends SubsystemBase {
                   ElevatorConstants.kMinElevatorHeightMeters,
                   ElevatorConstants.kMaxElevatorHeightMeters),
               0.0);
-      setpoint = profile.calculate(0.02, setpoint, goalState);
+
+      if (isDebouncerNeeded) {
+        // If a downward move is commanded, update only after the debouncer fires.
+        if (downDebouncer.calculate(true)) {
+          setpoint = profile.calculate(0.02, setpoint, goalState);
+        }
+        // Else: retain the current setpoint (i.e. do not update it yet)
+      } else {
+        // For upward moves or when no debounce is needed, update normally.
+        setpoint = profile.calculate(0.02, setpoint, goalState);
+      }
+
       double feedforwardOutput = ff.calculateWithVelocities(setpoint.velocity, setpoint.velocity);
       io.runPosition(
           setpoint.position,
@@ -321,71 +452,68 @@ public class Elevator extends SubsystemBase {
     public double characterizationOutput = 0.0;
   }
 
-  // In your Elevator class (or a separate characterization helper class) add:
-  public static Command feedforwardGravityCharacterization(Elevator elevator) {
-    // Constants for the characterization
-    final double GRAVITY_RAMP_RATE = 0.1; // Volts per second (adjust as needed)
-    final double GRAVITY_VELOCITY_THRESHOLD =
-        0.05; // m/s: threshold below which the elevator is considered stationary
-    final double SETTLE_TIME_SECONDS = 1.0; // Allow time for the mechanism to settle
+  public double getHeight() {
+    return inputs.positionMeters;
+  }
 
-    // A list to collect voltage samples taken when the elevator is still nearly stationary
-    List<Double> voltageSamples = new LinkedList<>();
-    Timer timer = new Timer();
+  /**
+   * Runs the flywheel open-loop at the specified voltage.
+   *
+   * @param volts The voltage command to apply to the flywheel motor(s).
+   */
+  public void runBottomFlywheelVolts(double volts) {
+    bottomFlywheelsIO.setVoltage(volts);
+  }
 
-    return Commands.sequence(
-        // 1. Clear any previous samples.
-        Commands.runOnce(
-            () -> {
-              voltageSamples.clear();
-            }),
+  public void runTopFlywheelVolts(double volts) {
+    topFlywheelsIO.setVoltage(volts);
+  }
 
-        // 2. Let the elevator settle (with zero voltage).
-        Commands.run(
-                () -> {
-                  elevator.io.runOpenLoop(0.0);
-                },
-                elevator)
-            .withTimeout(SETTLE_TIME_SECONDS),
+  public void runFlywheelsVelocity(double topVelocityRPM, double bottomVelocityRPM) {
+    // Convert velocity from RPM to radians per second for internal calculations
+    var topVelocityRadPerSec = Units.rotationsPerMinuteToRadiansPerSecond(topVelocityRPM);
+    var bottomVelocityRadPerSec = Units.rotationsPerMinuteToRadiansPerSecond(bottomVelocityRPM);
+    // Calculate the feedforward voltage using the feedforward model and the current velocity
+    // This helps the motor controller achieve the desired speed more effectively
+    bottomFlywheelsIO.setVelocity(
+        bottomVelocityRadPerSec,
+        bottomFlywheelsFFModel.calculateWithVelocities(
+            bottomFlywheelsInputs.velocityRadPerSec, bottomVelocityRadPerSec));
 
-        // 3. Start the timer (this is our “ramp” clock).
-        Commands.runOnce(timer::restart),
+    // Log the commanded setpoint RPM for telemetry
+    Logger.recordOutput("Botttom Elevator Flywheel/SetpointRPM", bottomVelocityRPM);
 
-        // 4. Ramp the voltage open-loop and collect data.
-        //    The command will run until the measured velocity exceeds the threshold,
-        //    meaning the voltage is now high enough to move the elevator.
-        Commands.run(
-                () -> {
-                  // Compute a voltage that increases linearly with time.
-                  double voltage = timer.get() * GRAVITY_RAMP_RATE;
-                  // Command the elevator with this open-loop voltage.
-                  elevator.io.runOpenLoop(voltage);
+    topFlywheelsIO.setVelocity(
+        topVelocityRadPerSec,
+        topFlywheelsFFModel.calculateWithVelocities(
+            topFlywheelsInputs.velocityRadPerSec, topVelocityRadPerSec));
 
-                  // If the elevator is nearly stationary, record this voltage.
-                  if (Math.abs(elevator.inputs.velocityMetersPerSecond)
-                      < GRAVITY_VELOCITY_THRESHOLD) {
-                    voltageSamples.add(voltage);
-                  }
-                },
-                elevator)
-            .until(() -> elevator.inputs.velocityMetersPerSecond > GRAVITY_VELOCITY_THRESHOLD)
-            .finallyDo(
-                () -> {
-                  // Stop the timer once the command ends.
-                  timer.stop();
-                  // Average all the collected voltage samples.
-                  int n = voltageSamples.size();
-                  double sum = 0.0;
-                  for (double v : voltageSamples) {
-                    sum += v;
-                  }
-                  double kG = n > 0 ? sum / n : 0.0;
+    // Log the commanded setpoint RPM for telemetry
+    Logger.recordOutput("Top Elevator Flywheel/SetpointRPM", topVelocityRPM);
+    // Log the commanded setpoint RPM for telemetry
+    Logger.recordOutput("Bottom Elevator Flywheel/SetpointRPM", bottomVelocityRPM);
+  }
 
-                  // Log the determined value.
-                  NumberFormat formatter = new DecimalFormat("#0.00000");
-                  System.out.println(
-                      "********** Elevator Gravity Characterization Results **********");
-                  System.out.println("\tkG: " + formatter.format(kG));
-                }));
+  /** Stops the flywheel by halting motor outputs. */
+  public void stopFlywheels() {
+    topFlywheelsIO.stop();
+    bottomFlywheelsIO.stop();
+  }
+
+  /**
+   * Returns the current velocity of the flywheel in RPM.
+   *
+   * @return The current flywheel speed in rotations per minute.
+   */
+  @AutoLogOutput
+  public double getBottomFlywheelsVelocityRPM() {
+    // Converts radians per second to RPM for more human-readable units
+    return Units.radiansPerSecondToRotationsPerMinute(bottomFlywheelsInputs.velocityRadPerSec);
+  }
+
+  @AutoLogOutput
+  public double getTopFlywheelsVelocityRPM() {
+    // Converts radians per second to RPM for more human-readable units
+    return Units.radiansPerSecondToRotationsPerMinute(topFlywheelsInputs.velocityRadPerSec);
   }
 }

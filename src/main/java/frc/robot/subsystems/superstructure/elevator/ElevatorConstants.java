@@ -31,7 +31,7 @@ public class ElevatorConstants {
   public static final Translation2d elevatorOrigin = new Translation2d(100, 0); // FIXME ????
 
   // Defines the radius of the drum driving the elevator, converted from inches to meters
-  public static final double kElevatorDrumRadius = Units.inchesToMeters(1.41 / 2.0);
+  public static final double kElevatorDrumRadius = Units.inchesToMeters(1.41);
 
   // FIXME Defines the mass of the elevator carriage in kilograms
   public static final double kCarriageMass = 15.5; // kg
@@ -42,14 +42,14 @@ public class ElevatorConstants {
   public static final double kMinElevatorHeightMeters = 0.0;
 
   // FIXME Defines the maximum height the elevator can reach in meters
-  public static final double kMaxElevatorHeightMeters = 1.2;
+  public static final double kMaxElevatorHeightMeters = 1.35;
 
   // FIXME TEST Defines the gains for the elevator based on the current mode using a switch
   // expression
   public static final Gains gains =
       switch (ModeSetter.currentMode) {
         case SIM -> new Gains(1000, 0.0, 2, 2.0, 9.29, 0.03, 0.19);
-        case REAL, REPLAY -> new Gains(770, .0, 70, 45, 9.29, 0.03, 7);
+        case REAL, REPLAY -> new Gains(1.5, .0, 0.1, 0, 0.0, 0.0, 0.0);
       };
 
   // Defines a record to hold the PID and feedforward gains for the elevator

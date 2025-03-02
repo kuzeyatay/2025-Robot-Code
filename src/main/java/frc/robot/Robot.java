@@ -14,9 +14,16 @@
 package frc.robot;
 
 import au.grapplerobotics.CanBridge;
+import edu.wpi.first.wpilibj.Alert;
+import edu.wpi.first.wpilibj.Alert.AlertType;
+import edu.wpi.first.wpilibj.DriverStation;
+import edu.wpi.first.wpilibj.RobotController;
 import edu.wpi.first.wpilibj.Threads;
+import edu.wpi.first.wpilibj.Timer;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.CommandScheduler;
+import frc.robot.subsystems.led.Leds;
+import frc.robot.util.VirtualSubsystem;
 import org.ironmaple.simulation.SimulatedArena;
 import org.littletonrobotics.junction.LogFileUtil;
 import org.littletonrobotics.junction.LoggedRobot;
@@ -35,8 +42,21 @@ import org.littletonrobotics.urcl.URCL;
 public class Robot extends LoggedRobot {
   private Command autonomousCommand;
   private RobotContainer robotContainer;
+  private static final double lowBatteryVoltage = 11.8;
+  private static final double lowBatteryDisabledTime = 1.5;
+  private static final double lowBatteryMinCycleCount = 10;
+  private static int lowBatteryCycleCount = 0;
+  private final Timer disabledTimer = new Timer();
+
+  private final Alert lowBatteryAlert =
+      new Alert(
+          "Battery voltage is very low, consider turning off the robot or replacing the battery.",
+          AlertType.kWarning);
 
   public Robot() {
+    // Start loading animation
+    Leds.getInstance();
+
     CanBridge.runTCP();
     // Record metadata
     Logger.recordMetadata("ProjectName", BuildConstants.MAVEN_NAME);
@@ -88,12 +108,18 @@ public class Robot extends LoggedRobot {
     // Instantiate our RobotContainer. This will perform all our button bindings,
     // and put our autonomous chooser on the dashboard.
     robotContainer = new RobotContainer();
+
+    // Reset alert timers
+    disabledTimer.restart();
   }
 
   /** This function is called periodically during all modes. */
   @Override
   public void robotPeriodic() {
     // Switch thread to high priority to improve loop timing
+
+    VirtualSubsystem.periodicAll();
+    ;
     Threads.setCurrentThreadPriority(true, 99);
 
     // Runs the Scheduler. This is responsible for polling buttons, adding
@@ -105,6 +131,18 @@ public class Robot extends LoggedRobot {
 
     // Return to normal thread priority
     Threads.setCurrentThreadPriority(false, 10);
+
+    // Low battery alert
+    lowBatteryCycleCount += 1;
+    if (DriverStation.isEnabled()) {
+      disabledTimer.reset();
+    }
+    if (RobotController.getBatteryVoltage() <= lowBatteryVoltage
+        && disabledTimer.hasElapsed(lowBatteryDisabledTime)
+        && lowBatteryCycleCount >= lowBatteryMinCycleCount) {
+      lowBatteryAlert.set(true);
+      Leds.getInstance().lowBatteryAlert = true;
+    }
   }
 
   /** This function is called once when the robot is disabled. */

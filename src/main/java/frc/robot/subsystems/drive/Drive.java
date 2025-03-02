@@ -15,6 +15,7 @@ import edu.wpi.first.hal.FRCNetComm.tInstances;
 import edu.wpi.first.hal.FRCNetComm.tResourceType;
 import edu.wpi.first.hal.HAL;
 import edu.wpi.first.math.Matrix;
+import edu.wpi.first.math.controller.PIDController;
 import edu.wpi.first.math.estimator.SwerveDrivePoseEstimator;
 import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.math.geometry.Rotation2d;
@@ -63,6 +64,14 @@ public class Drive extends SubsystemBase implements Vision.VisionConsumer {
 
   // Initialize the raw gyro rotation as a Rotation2d object
   private Rotation2d rawGyroRotation = new Rotation2d();
+
+  // TARGET LOCK
+  public static double ROTATION_KP = 1000.0;
+  private static double ROTATION_KI = 0.0;
+  private static double ROTATION_KD = 0.0;
+  public static PIDController ROTATION_PID_CONTROLLER =
+      new PIDController(ROTATION_KP, ROTATION_KI, ROTATION_KD);
+  private double TARGET_LOCK_FEED_FORWARD = 0.0001;
 
   // Create an array to store the last known positions of each swerve module for delta calculations
   private SwerveModulePosition[] lastModulePositions = // For delta tracking

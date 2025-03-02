@@ -1,4 +1,19 @@
+// Copyright 2021-2025 FRC 6328
+// http://github.com/Mechanical-Advantage
+//
+// This program is free software; you can redistribute it and/or
+// modify it under the terms of the GNU General Public License
+// version 3 as published by the Free Software Foundation or
+// available in the root directory of this project.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+// GNU General Public License for more details.
+
 package frc.robot.subsystems.vision;
+
+import static frc.robot.subsystems.vision.VisionConstants.*;
 
 import edu.wpi.first.math.geometry.Pose3d;
 import edu.wpi.first.math.geometry.Rotation2d;
@@ -9,119 +24,104 @@ import java.util.List;
 import java.util.Set;
 import org.photonvision.PhotonCamera;
 
-/**
- * VisionIOPhotonVision is a concrete implementation of the VisionIO interface that integrates with
- * PhotonVision. It retrieves vision data such as target angles and pose estimates from a
- * PhotonVision camera, processes the data, and updates VisionIOInputs accordingly.
- */
+/** IO implementation for real PhotonVision hardware. */
 public class VisionIOPhotonVision implements VisionIO {
-  // The PhotonCamera object used to interact with the PhotonVision pipeline
   protected final PhotonCamera camera;
-
-  // The transform from the robot's reference frame to the camera's mounting position
   protected final Transform3d robotToCamera;
 
   /**
-   * Constructs a new VisionIOPhotonVision instance.
+   * Creates a new VisionIOPhotonVision.
    *
-   * @param name The configured name of the PhotonVision camera.
-   * @param robotToCamera The Transform3d representing the camera's position and orientation
-   *     relative to the robot.
+   * @param name The configured name of the camera.
+   * @param rotationSupplier The 3D position of the camera relative to the robot.
    */
   public VisionIOPhotonVision(String name, Transform3d robotToCamera) {
-    // Initialize the PhotonCamera with the given name
     camera = new PhotonCamera(name);
-
-    // Store the robot-to-camera transform for later use when calculating robot pose
     this.robotToCamera = robotToCamera;
   }
 
-  /**
-   * Updates the VisionIOInputs with the latest data from the PhotonVision camera. Checks camera
-   * connection status, retrieves target observations, and calculates pose observations if
-   * available.
-   *
-   * @param inputs The VisionIOInputs instance to populate with current vision data.
-   */
   @Override
   public void updateInputs(VisionIOInputs inputs) {
-    // Update the connection status of the camera
     inputs.connected = camera.isConnected();
 
-    // Prepare data structures to hold the IDs of detected AprilTags and pose observations
+    // Read new camera observations
     Set<Short> tagIds = new HashSet<>();
     List<PoseObservation> poseObservations = new LinkedList<>();
-
-    // Retrieve all unread results from the camera
     for (var result : camera.getAllUnreadResults()) {
-      // If there are targets, update the latest target observation (tx, ty) from the best target
+      // Update latest target observation
       if (result.hasTargets()) {
         inputs.latestTargetObservation =
             new TargetObservation(
                 Rotation2d.fromDegrees(result.getBestTarget().getYaw()),
                 Rotation2d.fromDegrees(result.getBestTarget().getPitch()));
       } else {
-        // If no targets are detected, reset the target observation angles to zero
         inputs.latestTargetObservation = new TargetObservation(new Rotation2d(), new Rotation2d());
       }
 
-      // If a multi-tag result is available, it can provide a full pose estimation of the robot on
-      // the field
-      if (result.multitagResult.isPresent()) {
+      // Add pose observation
+      if (result.multitagResult.isPresent()) { // Multitag result
         var multitagResult = result.multitagResult.get();
 
-        // fieldToCamera: Transform from field coordinates to the camera
+        // Calculate robot pose
         Transform3d fieldToCamera = multitagResult.estimatedPose.best;
-
-        // fieldToRobot: Transform from field to robot, found by removing the camera offset from
-        // fieldToCamera
         Transform3d fieldToRobot = fieldToCamera.plus(robotToCamera.inverse());
-
-        // Convert this transform into a full 3D pose for the robot
         Pose3d robotPose = new Pose3d(fieldToRobot.getTranslation(), fieldToRobot.getRotation());
 
-        // Calculate the average distance to all detected tags
+        // Calculate average tag distance
         double totalTagDistance = 0.0;
         for (var target : result.targets) {
-          // bestCameraToTarget gives the transform from camera to target; get its norm as a
-          // distance
           totalTagDistance += target.bestCameraToTarget.getTranslation().getNorm();
         }
 
-        // Add all used fiducial (tag) IDs to the tagIds set
+        // Add tag IDs
         tagIds.addAll(multitagResult.fiducialIDsUsed);
 
-        // Create a new PoseObservation record with the collected data
+        // Add observation
         poseObservations.add(
             new PoseObservation(
-                // Timestamp: Use the result's timestamp (in seconds) and account for pipeline
-                // latency
-                result.getTimestampSeconds(),
+                result.getTimestampSeconds(), // Timestamp
+                robotPose, // 3D pose estimate
+                multitagResult.estimatedPose.ambiguity, // Ambiguity
+                multitagResult.fiducialIDsUsed.size(), // Tag count
+                totalTagDistance / result.targets.size(), // Average tag distance
+                PoseObservationType.PHOTONVISION)); // Observation type
 
-                // The 3D pose estimate of the robot in field coordinates
-                robotPose,
+      } else if (!result.targets.isEmpty()) { // Single tag result
+        var target = result.targets.get(0);
 
-                // The ambiguity from the multi-tag result, indicating confidence in the pose
-                multitagResult.estimatedPose.ambiguity,
+        // Calculate robot pose
+        var tagPose = aprilTagLayout.getTagPose(target.fiducialId);
+        if (tagPose.isPresent()) {
+          Transform3d fieldToTarget =
+              new Transform3d(tagPose.get().getTranslation(), tagPose.get().getRotation());
+          Transform3d cameraToTarget = target.bestCameraToTarget;
+          Transform3d fieldToCamera = fieldToTarget.plus(cameraToTarget.inverse());
+          Transform3d fieldToRobot = fieldToCamera.plus(robotToCamera.inverse());
+          Pose3d robotPose = new Pose3d(fieldToRobot.getTranslation(), fieldToRobot.getRotation());
 
-                // The number of tags used to produce this observation
-                multitagResult.fiducialIDsUsed.size(),
+          // Add tag ID
+          tagIds.add((short) target.fiducialId);
 
-                // Average tag distance computed above
-                totalTagDistance / result.targets.size(),
-
-                // Indicate that this observation came from PHOTONVISION
-                PoseObservationType.PHOTONVISION));
+          // Add observation
+          poseObservations.add(
+              new PoseObservation(
+                  result.getTimestampSeconds(), // Timestamp
+                  robotPose, // 3D pose estimate
+                  target.poseAmbiguity, // Ambiguity
+                  1, // Tag count
+                  cameraToTarget.getTranslation().getNorm(), // Average tag distance
+                  PoseObservationType.PHOTONVISION)); // Observation type
+        }
       }
     }
 
-    // Convert the poseObservations list to an array and assign it to inputs
+    // Save pose observations to inputs object
     inputs.poseObservations = new PoseObservation[poseObservations.size()];
     for (int i = 0; i < poseObservations.size(); i++) {
       inputs.poseObservations[i] = poseObservations.get(i);
     }
 
-    // Convert the set of tag IDs to an array and assign it to inputs
+    // Save tag IDs to inputs objects
     inputs.tagIds = new int[tagIds.size()];
     int i = 0;
     for (int id : tagIds) {

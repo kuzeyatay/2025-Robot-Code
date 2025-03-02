@@ -5,7 +5,7 @@
 // license that can be found in the LICENSE file at
 // the root directory of this project.
 
-package frc.robot;
+package frc.robot.util;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -156,8 +156,8 @@ public class FieldConstants {
 
   public enum ReefLevel {
     L1(Units.inchesToMeters(25.0), 0),
-    L2(Units.inchesToMeters(31.875 - Math.cos(Math.toRadians(35.0)) * 0.625) - 0.795, -35),
-    L3(Units.inchesToMeters(47.625 - Math.cos(Math.toRadians(35.0)) * 0.625) - 0.795, -35),
+    L2(Units.inchesToMeters(31.875 - Math.cos(Math.toRadians(35.0)) * 0.625), -35),
+    L3(Units.inchesToMeters(47.625 - Math.cos(Math.toRadians(35.0)) * 0.625), -35),
     L4(Units.inchesToMeters(72), -90);
 
     ReefLevel(double height, double pitch) {
@@ -189,21 +189,19 @@ public class FieldConstants {
     FIELD_BORDER("2025-field-border");
 
     AprilTagLayoutType(String name) {
-      if (ModeSetter.disableHAL) {
-        layout = null;
-      } else {
-        try {
-          layout =
-              new AprilTagFieldLayout(
-                  Path.of(
-                      Filesystem.getDeployDirectory().getPath(),
-                      "apriltags",
-                      fieldType.getJsonFolder(),
-                      name + ".json"));
-        } catch (IOException e) {
-          throw new RuntimeException(e);
-        }
+
+      try {
+        layout =
+            new AprilTagFieldLayout(
+                Path.of(
+                    Filesystem.getDeployDirectory().getPath(),
+                    "apriltags",
+                    fieldType.getJsonFolder(),
+                    name + ".json"));
+      } catch (IOException e) {
+        throw new RuntimeException(e);
       }
+
       if (layout == null) {
         layoutString = "";
       } else {

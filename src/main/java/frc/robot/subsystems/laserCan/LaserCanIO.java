@@ -9,7 +9,7 @@ public interface LaserCanIO {
   @AutoLog
   public class LaserCanIOInputs {
 
-    double m_distance;
+    public double m_distance;
   }
   /**
    * Updates the set of loggable inputs with the current state of the laserCan hardware.

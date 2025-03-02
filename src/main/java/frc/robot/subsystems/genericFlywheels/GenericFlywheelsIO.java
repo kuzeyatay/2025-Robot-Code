@@ -1,4 +1,4 @@
-package frc.robot.subsystems.superstructure.coralFlywheels;
+package frc.robot.subsystems.genericFlywheels;
 
 import org.littletonrobotics.junction.AutoLog;
 
@@ -7,14 +7,16 @@ import org.littletonrobotics.junction.AutoLog;
  * updating sensor data, running the flywheel in open or closed loop, stopping the flywheel, and
  * configuring PID constants.
  */
-public interface CoralFlywheelsIO {
+public interface GenericFlywheelsIO {
   // AutoLog annotation indicates that the FlywheelIOInputs class fields will be automatically
   // logged
   @AutoLog
-  public static class CoralFlywheelsIOInputs {
+  public static class GenericFlywheelsIOInputs {
 
     // The current angular position of the flywheel in radians
     public double positionRad = 0.0;
+
+    public double encoderPositionRad = 0.0;
 
     // The current angular velocity of the flywheel in radians per second
     public double velocityRadPerSec = 0.0;
@@ -31,7 +33,7 @@ public interface CoralFlywheelsIO {
    *
    * @param inputs An instance of FlywheelIOInputs to populate with sensor and status data.
    */
-  public default void updateInputs(CoralFlywheelsIOInputs inputs) {}
+  public default void updateInputs(GenericFlywheelsIOInputs inputs) {}
 
   /**
    * Runs the flywheel in open loop mode at the specified voltage. This method directly applies a
@@ -61,4 +63,6 @@ public interface CoralFlywheelsIO {
    * @param kD The derivative gain for the velocity PID controller.
    */
   public default void configurePID(double kP, double kI, double kD) {}
+
+  default void setBrakeMode(boolean enabled) {}
 }

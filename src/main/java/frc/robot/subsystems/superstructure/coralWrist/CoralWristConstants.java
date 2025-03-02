@@ -23,7 +23,7 @@ public final class CoralWristConstants {
   public static final Translation2d armOrigin = new Translation2d(0, 0); // FIXME ????
 
   // Calculate the gear ratio for the arm based on multiple gear stages
-  public static final double kArmGearRatio = (64.0 / 12.0) * (42 / 15);
+  public static final double kArmGearRatio = (64.0 / 12.0) * (42.0 / 15.0);
 
   // Define the CAN ID for the leader motor controller
   public static final int leaderID = 15;
@@ -49,9 +49,9 @@ public final class CoralWristConstants {
   public static final Gains gains =
       switch (ModeSetter.currentMode) {
           // In simulation mode, use higher kP and set other gains accordingly
-        case SIM -> new Gains(100, 0.0, 0.0, 2.0, 0.0, 0.0, 0.0);
+        case SIM -> new Gains(0.1, 0.0, 0.0, 2.0, 0.0, 0.0, 0.0);
           // In real or replay modes, use different gains for actual hardware
-        case REAL, REPLAY -> new Gains(75.0, 0.0, 2.5, 0.0, 0.0, 0.0, 0.0);
+        case REAL, REPLAY -> new Gains(75, 0.0, 0.5, 0.25, 0.06, 0.01, 0.3);
       };
 
   // Define a record to hold the PID and feedforward gains

@@ -193,10 +193,7 @@ public class ModuleIOSpark implements ModuleIO {
         () ->
             turnSpark.configure(
                 turnConfig, ResetMode.kResetSafeParameters, PersistMode.kPersistParameters));
-    tryUntilOk(
-        turnSpark,
-        5,
-        () -> turnEncoder.setPosition(turnAbsoluteEncoder.getPosition().getValueAsDouble()));
+    tryUntilOk(turnSpark, 5, () -> turnEncoder.setPosition(0));
   }
 
   @Override

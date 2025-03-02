@@ -15,7 +15,6 @@ import edu.wpi.first.units.measure.AngularVelocity;
 import edu.wpi.first.units.measure.Current;
 import edu.wpi.first.units.measure.Temperature;
 import edu.wpi.first.units.measure.Voltage;
-import frc.robot.subsystems.superstructure.algeManipulator.AlgeManipulatorConstants;
 
 // Define the ArmIOKrakenFOC class, which implements the ArmIO interface
 public class CoralWristIOKrakenFOC implements CoralWristIO {
@@ -23,7 +22,7 @@ public class CoralWristIOKrakenFOC implements CoralWristIO {
 
   // Define the leader TalonFX motor controller with the leaderID from ArmConstants and connected to
   // the "rio" CAN bus
-  private final TalonFX leaderTalon;
+  private final TalonFX talon;
 
   // Status Signals
 
@@ -41,17 +40,19 @@ public class CoralWristIOKrakenFOC implements CoralWristIO {
   // List of status signals for the motor temperatures in Celsius
   private final StatusSignal<Temperature> tempCelsius;
 
-  // Control Modes
+  // Define a torque current control mode with initial torque of 0.0 amps and update frequency of
+  // 0.0 Hz
 
   // Define a voltage control mode with initial voltage of 0.0 volts, enabling FOC (Field-Oriented
   // Control), and
   // update frequency of 0.0 Hz
   private final VoltageOut voltageControl =
       new VoltageOut(0.0).withEnableFOC(true).withUpdateFreqHz(0.0);
-  // Define a torque current control mode with initial torque of 0.0 amps and update frequency of
-  // 0.0 Hz
   private final TorqueCurrentFOC currentControl = new TorqueCurrentFOC(0.0).withUpdateFreqHz(0.0);
 
+  // Control Requests
+  private final TorqueCurrentFOC torqueCurrentRequest =
+      new TorqueCurrentFOC(0.0).withUpdateFreqHz(0.0);
   // Configuration
 
   // Create a new TalonFX configuration object to hold various settings
@@ -60,7 +61,7 @@ public class CoralWristIOKrakenFOC implements CoralWristIO {
   // Constructor for the ArmIOKrakenFOC class
   public CoralWristIOKrakenFOC() {
     // Initialize the leader TalonFX motor controller with the specified CAN ID and CAN bus
-    leaderTalon = new TalonFX(AlgeManipulatorConstants.leaderID, "rio");
+    talon = new TalonFX(CoralWristConstants.leaderID, "rio");
 
     // Configure the leader TalonFX motor controller settings
 
@@ -71,35 +72,35 @@ public class CoralWristIOKrakenFOC implements CoralWristIO {
 
     // Configure motor output settings based on inversion from ArmConstants
     config.MotorOutput.Inverted =
-        AlgeManipulatorConstants.leaderInverted
+        CoralWristConstants.leaderInverted
             ? InvertedValue.Clockwise_Positive
             : InvertedValue.CounterClockwise_Positive;
     // Set the neutral mode to brake
-    config.MotorOutput.NeutralMode = NeutralModeValue.Brake;
+    config.MotorOutput.NeutralMode = NeutralModeValue.Coast;
     // Set the sensor to mechanism gear ratio to 1.0 (no additional gearing)
-    config.Feedback.SensorToMechanismRatio = AlgeManipulatorConstants.kArmGearRatio;
+    config.Feedback.SensorToMechanismRatio = CoralWristConstants.kArmGearRatio;
     // Apply the TalonFX configuration to the leader Talon with a timeout of 1.0 seconds
     config.CurrentLimits.StatorCurrentLimitEnable = true;
-    tryUntilOk(5, () -> leaderTalon.getConfigurator().apply(config, 0.25));
+    tryUntilOk(5, () -> talon.getConfigurator().apply(config, 0.25));
 
     // Initialize Status Signals
 
-    leaderTalon.setPosition(0);
+    talon.setPosition(0);
 
     // Get the internal position from the leader TalonFX
-    internalPositionRotations = leaderTalon.getPosition();
+    internalPositionRotations = talon.getPosition();
     // Get the absolute encoder position from the CANcoder
 
     // Get the velocity in rotations per second from the leader TalonFX
-    velocityRps = leaderTalon.getVelocity();
+    velocityRps = talon.getVelocity();
     // Get the applied voltages to the motors from the leader TalonFX
-    appliedVoltage = leaderTalon.getMotorVoltage();
+    appliedVoltage = talon.getMotorVoltage();
     // Get the supply currents in amps from the leader TalonFX
-    supplyCurrent = leaderTalon.getSupplyCurrent();
+    supplyCurrent = talon.getSupplyCurrent();
     // Get the torque currents in amps from the leader TalonFX
-    torqueCurrent = leaderTalon.getTorqueCurrent();
+    torqueCurrent = talon.getTorqueCurrent();
     // Get the temperatures in Celsius from the leader TalonFX
-    tempCelsius = leaderTalon.getDeviceTemp();
+    tempCelsius = talon.getDeviceTemp();
 
     // Set the update frequency for various status signals to optimize data transmission
 
@@ -119,17 +120,16 @@ public class CoralWristIOKrakenFOC implements CoralWristIO {
     BaseStatusSignal.setUpdateFrequencyForAll(500, internalPositionRotations);
 
     // Optimize CAN bus utilization by scheduling message updates efficiently
-    leaderTalon.optimizeBusUtilization(0, 1.0);
+    talon.optimizeBusUtilization(0, 1.0);
 
     // Set Motion Magic control parameters
     // set slot 0 gains
     var slot0Configs = config.Slot0;
     slot0Configs.kS =
-        AlgeManipulatorConstants.gains.ffkS(); // Add 0.25 V output to overcome static friction
+        CoralWristConstants.gains.ffkS(); // Add 0.25 V output to overcome static friction
     slot0Configs.kV =
-        AlgeManipulatorConstants.gains
-            .ffkV(); // A velocity target of 1 rps results in 0.12 V output
-    slot0Configs.kA = AlgeManipulatorConstants.gains.ffkA();
+        CoralWristConstants.gains.ffkV(); // A velocity target of 1 rps results in 0.12 V output
+    slot0Configs.kA = CoralWristConstants.gains.ffkA();
     ; // An acceleration of 1 rps/s requires 0.01 V output
 
     // Retrieve the MotionMagic configuration from the TalonFX configuration
@@ -183,8 +183,13 @@ public class CoralWristIOKrakenFOC implements CoralWristIO {
     // Set the control parameters: position (converted from radians to rotations), feedforward
     // voltage, and enable
     // FOC
-    leaderTalon.setControl(
-        request.withPosition(Units.radiansToRotations(setpointRads)).withFeedForward(feedforward));
+
+    talon.setControl(
+        request
+            .withPosition(Units.radiansToRotations(setpointRads))
+            .withFeedForward(0.015)
+            .withSlot(0)
+            .withEnableFOC(true));
   }
 
   // Override the runVolts method from the ArmIO interface to apply specific voltages to the arm
@@ -192,7 +197,7 @@ public class CoralWristIOKrakenFOC implements CoralWristIO {
   @Override
   public void runVolts(double volts) {
     // Apply the specified voltages using the predefined voltage control mode
-    leaderTalon.setControl(voltageControl.withOutput(volts));
+    talon.setControl(voltageControl.withOutput(volts));
   }
 
   // Override the runCurrent method from the ArmIO interface to apply specific currents to the arm
@@ -200,7 +205,7 @@ public class CoralWristIOKrakenFOC implements CoralWristIO {
   @Override
   public void runCurrent(double amps) {
     // Apply the specified currents using the predefined torque current control mode
-    leaderTalon.setControl(currentControl.withOutput(amps));
+    talon.setControl(currentControl.withOutput(amps));
   }
 
   // Override the setBrakeMode method from the ArmIO interface to enable or disable brake mode on
@@ -208,7 +213,7 @@ public class CoralWristIOKrakenFOC implements CoralWristIO {
   @Override
   public void setBrakeMode(boolean enabled) {
     // Set the neutral mode to Brake if enabled is true, otherwise set to Coast
-    leaderTalon.setNeutralMode(enabled ? NeutralModeValue.Brake : NeutralModeValue.Coast);
+    talon.setNeutralMode(enabled ? NeutralModeValue.Brake : NeutralModeValue.Coast);
   }
 
   // Override the setPID method from the ArmIO interface to update the PID controller gains
@@ -221,19 +226,19 @@ public class CoralWristIOKrakenFOC implements CoralWristIO {
     // Update the derivative gain in the configuration
     config.Slot0.kD = d;
     // Apply the updated configuration to the leader TalonFX with a timeout of 0.01 seconds
-    leaderTalon.getConfigurator().apply(config, 0.01);
+    talon.getConfigurator().apply(config, 0.01);
   }
 
   // Override the stop method from the ArmIO interface to immediately stop all arm motors
   @Override
   public void stop() {
     // Send a NeutralOut control command to stop the leader TalonFX motor
-    leaderTalon.setControl(new NeutralOut());
+    talon.stopMotor();
   }
 
   @Override
   public void zero() {
 
-    leaderTalon.setPosition(0);
+    talon.setPosition(0);
   }
 }

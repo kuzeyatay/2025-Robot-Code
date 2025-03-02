@@ -3,7 +3,6 @@ package frc.robot;
 import static frc.robot.subsystems.vision.VisionConstants.*;
 
 import com.pathplanner.lib.auto.AutoBuilder;
-import com.pathplanner.lib.commands.PathPlannerAuto;
 import com.pathplanner.lib.path.GoalEndState;
 import com.pathplanner.lib.path.IdealStartingState;
 import com.pathplanner.lib.path.PathConstraints;
@@ -14,45 +13,50 @@ import edu.wpi.first.math.geometry.Pose3d;
 import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.math.geometry.Translation2d;
 import edu.wpi.first.math.util.Units;
+import edu.wpi.first.wpilibj.Alert;
+import edu.wpi.first.wpilibj.Alert.AlertType;
+import edu.wpi.first.wpilibj.DriverStation;
 import edu.wpi.first.wpilibj.GenericHID;
+import edu.wpi.first.wpilibj.GenericHID.RumbleType;
 import edu.wpi.first.wpilibj.XboxController;
 import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.Commands;
-import edu.wpi.first.wpilibj2.command.InstantCommand;
+import edu.wpi.first.wpilibj2.command.button.CommandPS5Controller;
 import edu.wpi.first.wpilibj2.command.button.CommandXboxController;
+import edu.wpi.first.wpilibj2.command.button.RobotModeTriggers;
+import edu.wpi.first.wpilibj2.command.button.Trigger;
 import frc.robot.commands.drive.DriveCommands;
 import frc.robot.subsystems.drive.*;
+import frc.robot.subsystems.genericFlywheels.GenericFlywheelsIO;
+import frc.robot.subsystems.genericFlywheels.GenericFlywheelsIOSim;
+import frc.robot.subsystems.genericFlywheels.GenericFlywheelsIOSparkMax;
+import frc.robot.subsystems.laserCan.LaserCanIO;
+import frc.robot.subsystems.laserCan.LaserCanIOLaserCan;
+import frc.robot.subsystems.laserCan.LaserCanIOSim;
+import frc.robot.subsystems.led.Leds;
+import frc.robot.subsystems.superstructure.Superstructure;
+import frc.robot.subsystems.superstructure.SuperstructureState;
 import frc.robot.subsystems.superstructure.algeManipulator.AlgeManipulator;
 import frc.robot.subsystems.superstructure.algeManipulator.AlgeManipulatorIO;
 import frc.robot.subsystems.superstructure.algeManipulator.AlgeManipulatorIOKrakenFOC;
 import frc.robot.subsystems.superstructure.algeManipulator.AlgeManipulatorIOSim;
-import frc.robot.subsystems.superstructure.algeManipulatorFlywheels.AlgeManipulatorFlywheels;
-import frc.robot.subsystems.superstructure.algeManipulatorFlywheels.AlgeManipulatorFlywheelsIO;
-import frc.robot.subsystems.superstructure.algeManipulatorFlywheels.AlgeManipulatorFlywheelsSim;
-import frc.robot.subsystems.superstructure.algeManipulatorFlywheels.AlgeManipulatorFlywheelsSparkMax;
-import frc.robot.subsystems.superstructure.coralFlywheels.CoralFlywheels;
-import frc.robot.subsystems.superstructure.coralFlywheels.CoralFlywheelsIO;
-import frc.robot.subsystems.superstructure.coralFlywheels.CoralFlywheelsSim;
-import frc.robot.subsystems.superstructure.coralFlywheels.CoralFlywheelsSparkMax;
+import frc.robot.subsystems.superstructure.coralWrist.CoralWrist;
+import frc.robot.subsystems.superstructure.coralWrist.CoralWristIO;
+import frc.robot.subsystems.superstructure.coralWrist.CoralWristIOKrakenFOC;
+import frc.robot.subsystems.superstructure.coralWrist.CoralWristIOSim;
 import frc.robot.subsystems.superstructure.elevator.Elevator;
 import frc.robot.subsystems.superstructure.elevator.ElevatorIO;
 import frc.robot.subsystems.superstructure.elevator.ElevatorIOSim;
 import frc.robot.subsystems.superstructure.elevator.ElevatorIOTalonFX;
-import frc.robot.subsystems.superstructure.elevatorFlywheels.ElevatorFlywheels;
-import frc.robot.subsystems.superstructure.elevatorFlywheels.ElevatorFlywheelsIO;
-import frc.robot.subsystems.superstructure.elevatorFlywheels.ElevatorFlywheelsIOSim;
-import frc.robot.subsystems.superstructure.elevatorFlywheels.ElevatorFlywheelsIOSparkMax;
-import frc.robot.subsystems.superstructure.elevatorFlywheels.TopElevatorFlywheels;
-import frc.robot.subsystems.superstructure.elevatorFlywheels.TopElevatorFlywheelsIO;
-import frc.robot.subsystems.superstructure.elevatorFlywheels.TopElevatorFlywheelsIOSim;
-import frc.robot.subsystems.superstructure.elevatorFlywheels.TopElevatorFlywheelsIOSparkMax;
 import frc.robot.subsystems.vision.*;
+import frc.robot.util.OverrideSwitches;
 import java.util.List;
 import org.ironmaple.simulation.SimulatedArena;
 import org.ironmaple.simulation.drivesims.SwerveDriveSimulation;
 import org.littletonrobotics.junction.Logger;
 import org.littletonrobotics.junction.networktables.LoggedDashboardChooser;
+import org.littletonrobotics.junction.networktables.LoggedNetworkNumber;
 
 /**
  * This class is where the bulk of the robot should be declared. Since Command-based is a
@@ -66,25 +70,40 @@ public class RobotContainer {
   public final Vision vision;
   private final Elevator elevator;
   private final AlgeManipulator algeManipulator;
-  private final AlgeManipulatorFlywheels algeManipulatorFlywheels;
-  private final ElevatorFlywheels elevatorFlywheel;
-  private final TopElevatorFlywheels topElevatorFlywheel;
-  private final CoralFlywheels coralFlywheels;
+  private final Superstructure superstructure;
 
-  // ivate final CoralFlywheel coralFlywheel;
-  // rivate final CoralWrist coralWrist;
+  // private final CoralFlywheel coralFlywheel;
+  private final CoralWrist coralWrist;
   // ivate final Flywheels flywheels;
 
   private SwerveDriveSimulation driveSimulation = null;
 
+  private final CommandPS5Controller driver = new CommandPS5Controller(1);
   // Controller
-  private final CommandXboxController controller = new CommandXboxController(0);
+  private final CommandXboxController operator = new CommandXboxController(0);
 
   // Dashboard inputs
   private final LoggedDashboardChooser<Command> autoChooser;
 
+  // Controllers
+  private final OverrideSwitches overrides = new OverrideSwitches(5);
+  private final Trigger superstructureCoast = overrides.driverSwitch(2);
+  private final Trigger superstructureDisable = overrides.driverSwitch(1);
+  private boolean superstructureCoastOverride = false;
+  private final Alert driverDisconnected =
+      new Alert("Driver controller disconnected (port 0).", AlertType.kWarning);
+  private final Alert operatorDisconnected =
+      new Alert("Operator controller disconnected (port 1).", AlertType.kWarning);
+  private final Alert overrideDisconnected =
+      new Alert("Override controller disconnected (port 5).", AlertType.kInfo);
+  private final LoggedNetworkNumber endgameAlert1 =
+      new LoggedNetworkNumber("/SmartDashboard/Endgame Alert #1", 30.0);
+  private final LoggedNetworkNumber endgameAlert2 =
+      new LoggedNetworkNumber("/SmartDashboard/Endgame Alert #2", 15.0);
+
   /** The container for the robot. Contains subsystems, OI devices, and commands. */
   public RobotContainer() {
+
     switch (ModeSetter.currentMode) {
       case REAL:
         // Real robot, instantiate hardware IO implementations
@@ -98,20 +117,29 @@ public class RobotContainer {
 
         this.vision =
             new Vision(
-                drive,
-                new VisionIOLimelight(VisionConstants.camera0Name, drive::getRotation),
-                new VisionIOLimelight(VisionConstants.camera1Name, drive::getRotation));
+                drive, new VisionIOLimelight(VisionConstants.camera0Name, drive::getRotation));
 
-        elevator = new Elevator(new ElevatorIOTalonFX());
-        algeManipulator = new AlgeManipulator(new AlgeManipulatorIOKrakenFOC());
-        algeManipulatorFlywheels =
-            new AlgeManipulatorFlywheels(new AlgeManipulatorFlywheelsSparkMax());
-        elevatorFlywheel = new ElevatorFlywheels(new ElevatorFlywheelsIOSparkMax());
-        topElevatorFlywheel = new TopElevatorFlywheels(new TopElevatorFlywheelsIOSparkMax());
-        coralFlywheels = new CoralFlywheels(new CoralFlywheelsSparkMax());
-        // oralWrist = new CoralWrist(new CoralWristIOKrakenFOC());
+        elevator =
+            new Elevator(
+                new ElevatorIOTalonFX(),
+                new GenericFlywheelsIOSparkMax(34, 24 / 15, false),
+                new GenericFlywheelsIOSparkMax(33, 24 / 15, false));
+        algeManipulator =
+            new AlgeManipulator(
+                new AlgeManipulatorIOKrakenFOC(),
+                new GenericFlywheelsIOSparkMax(18, 42 / 18, false),
+                new LaserCanIOLaserCan(42));
+
+        coralWrist =
+            new CoralWrist(
+                new CoralWristIOKrakenFOC(),
+                new GenericFlywheelsIOSparkMax(17, 20 / 15, true),
+                new LaserCanIOLaserCan(41),
+                new LaserCanIOLaserCan(40));
         // ralFlywheel = new CoralFlywheel(new CoralFlywheelIOSparkMax());
         // ywheels = new Flywheels(new FlywheelsIOSparkMax());
+
+        superstructure = new Superstructure(elevator, algeManipulator, coralWrist);
         break;
       case SIM:
         // create a maple-sim swerve drive simulation instance
@@ -137,17 +165,24 @@ public class RobotContainer {
                 new VisionIOPhotonVisionSim(
                     camera1Name, robotToCamera1, driveSimulation::getSimulatedDriveTrainPose));
 
-        elevator = new Elevator(new ElevatorIOSim());
-        algeManipulator = new AlgeManipulator(new AlgeManipulatorIOSim());
-        algeManipulatorFlywheels = new AlgeManipulatorFlywheels(new AlgeManipulatorFlywheelsSim());
-        elevatorFlywheel = new ElevatorFlywheels(new ElevatorFlywheelsIOSim());
-        topElevatorFlywheel = new TopElevatorFlywheels(new TopElevatorFlywheelsIOSim());
-        coralFlywheels = new CoralFlywheels(new CoralFlywheelsSim());
+        elevator =
+            new Elevator(
+                new ElevatorIOSim(), new GenericFlywheelsIOSim(), new GenericFlywheelsIOSim());
+        algeManipulator =
+            new AlgeManipulator(
+                new AlgeManipulatorIOSim(), new GenericFlywheelsIOSim(), new LaserCanIOSim());
 
-        // ralWrist = new CoralWrist(new CoralWristIOSim());
+        coralWrist =
+            new CoralWrist(
+                new CoralWristIOSim(),
+                new GenericFlywheelsIOSim(),
+                new LaserCanIOSim(),
+                new LaserCanIOSim());
         // ralFlywheel = new CoralFlywheel(new CoralFlywheelIOSim());
         // ywheels = new Flywheels(new FlywheelsIOSim());
         // AIRobotInSimulation.startOpponentRobotSimulations();
+
+        superstructure = new Superstructure(elevator, algeManipulator, coralWrist);
 
         break;
 
@@ -161,17 +196,27 @@ public class RobotContainer {
                 new ModuleIO() {},
                 new ModuleIO() {});
         vision = new Vision(drive, new VisionIO() {}, new VisionIO() {});
-        elevator = new Elevator(new ElevatorIO() {});
-        algeManipulator = new AlgeManipulator(new AlgeManipulatorIO() {});
-        algeManipulatorFlywheels =
-            new AlgeManipulatorFlywheels(new AlgeManipulatorFlywheelsIO() {});
-        elevatorFlywheel = new ElevatorFlywheels(new ElevatorFlywheelsIO() {});
-        topElevatorFlywheel = new TopElevatorFlywheels(new TopElevatorFlywheelsIO() {});
-        coralFlywheels = new CoralFlywheels(new CoralFlywheelsIO() {});
-        // ralWrist = new CoralWrist(new CoralWristIO() {});
+        elevator =
+            new Elevator(
+                new ElevatorIO() {}, new GenericFlywheelsIO() {}, new GenericFlywheelsIO() {});
+
+        algeManipulator =
+            new AlgeManipulator(
+                new AlgeManipulatorIO() {}, new GenericFlywheelsIO() {}, new LaserCanIO() {});
+
+        coralWrist =
+            new CoralWrist(
+                new CoralWristIO() {},
+                new GenericFlywheelsIO() {},
+                new LaserCanIO() {},
+                new LaserCanIO() {});
+
+        superstructure = new Superstructure(elevator, algeManipulator, coralWrist);
 
         break;
     }
+    // Set up overrides
+    superstructure.setDisabledOverride(superstructureDisable);
 
     // Set up auto routines
     autoChooser = new LoggedDashboardChooser<>("Auto Choices", AutoBuilder.buildAutoChooser());
@@ -214,90 +259,22 @@ public class RobotContainer {
     drive.setDefaultCommand(
         DriveCommands.joystickDrive(
             drive,
-            () -> -controller.getLeftY(),
-            () -> -controller.getLeftX(),
-            () -> -controller.getRawAxis(2)));
+            () -> -driver.getLeftY(),
+            () -> -driver.getLeftX(),
+            () -> -driver.getRawAxis(2)));
 
     // Lock to 0° when A button is held
-    controller
-        .a()
-        .whileTrue(
-            DriveCommands.joystickDriveAtAngle(
-                drive,
-                () -> -controller.getLeftY(),
-                () -> -controller.getLeftX(),
-                () -> new Rotation2d(0)));
-
-    autoChooser.addOption("Elevator static", elevator.staticCharacterization(2.0));
-
-    // Elevator Test
-    controller.b().onTrue(elevator.homingSequence());
-    controller.y().onTrue(new InstantCommand(() -> elevator.setGoal(Elevator.Goal.L2)));
-    // controller
-    //  .a()
-    // .whileTrue(
-    //   Commands.startEnd(
-    //   () -> coralFlywheel.runVelocity(4000), coralFlywheel::stop, coralFlywheel));
-
-    controller
-        .a()
-        .whileTrue(
-            Commands.startEnd(
-                () -> algeManipulatorFlywheels.runVelocity(-1000),
-                algeManipulatorFlywheels::stop,
-                algeManipulatorFlywheels));
-
-    controller
-        .leftBumper()
-        .whileTrue(
-            Commands.startEnd(
-                () -> coralFlywheels.runVolts(9), coralFlywheels::stop, coralFlywheels));
-
-    controller
-        .rightBumper()
-        .whileTrue(
-            Commands.startEnd(
-                () -> elevatorFlywheel.runVelocity(1000),
-                elevatorFlywheel::stop,
-                elevatorFlywheel));
-
-    controller
-        .rightBumper()
-        .whileTrue(
-            Commands.startEnd(
-                () -> topElevatorFlywheel.runVelocity(-1000),
-                topElevatorFlywheel::stop,
-                topElevatorFlywheel));
-
-    controller
-        .leftBumper()
-        .whileTrue(
-            Commands.startEnd(
-                () -> elevatorFlywheel.runVelocity(-1000),
-                elevatorFlywheel::stop,
-                elevatorFlywheel));
-
-    controller
-        .leftBumper()
-        .whileTrue(
-            Commands.startEnd(
-                () -> topElevatorFlywheel.runVelocity(1000),
-                topElevatorFlywheel::stop,
-                topElevatorFlywheel));
-
-    controller
-        .a()
-        .onTrue(new InstantCommand(() -> algeManipulator.setAngle(AlgeManipulator.Goal.PROCESSOR)));
-
-    controller.x().onTrue(algeManipulator.homingSequence());
-
-    /*ontroller
-    .x()
-    .onTrue(new InstantCommand(() -> algeManipulator.setGoal(AlgeManipulator.Goal.STOW)));*/
-    // controller.x().onTrue(new InstantCommand(() -> elevator.staticCharacterization(2.0)));
+    /*    driver
+    .circle()
+    .whileTrue(
+        DriveCommands.joystickDriveAtAngle(
+            drive,
+            () -> -driver.getLeftY(),
+            () -> -driver.getLeftX(),
+            () -> new Rotation2d(0))); */
 
     // Switch to X pattern when X button is pressed
-    controller.x().onTrue(Commands.runOnce(drive::stopWithX, drive));
+    driver.triangle().onTrue(Commands.runOnce(drive::stopWithX, drive));
 
     // Reset gyro / odometry
     final Runnable resetGyro =
@@ -311,23 +288,91 @@ public class RobotContainer {
                 drive.resetOdometry(
                     new Pose2d(drive.getPose().getTranslation(), new Rotation2d())); // zero gyro
 
-    controller.start().onTrue(Commands.runOnce(resetGyro, drive).ignoringDisable(true));
+    driver.square().onTrue(Commands.runOnce(resetGyro, drive).ignoringDisable(true));
+
+    // autoChooser.addOption("Elevator static", elevator.staticCharacterization(2.0));
+
+    operator.a().onTrue(superstructure.runGoal(SuperstructureState.CORAL_INTAKE));
+    operator.b().onTrue(superstructure.runGoal(SuperstructureState.CORAL_STOW));
+    operator.x().onTrue(superstructure.runGoal(SuperstructureState.L2_CORAL_EJECT));
+    operator.leftBumper().onTrue(superstructure.runGoal(SuperstructureState.L3_CORAL_EJECT));
+    operator.rightBumper().onTrue(superstructure.runGoal(SuperstructureState.L4_CORAL_EJECT));
+
+    operator.button(7).whileTrue(coralWrist.homingSequence());
+    operator.y().onTrue(superstructure.runGoal(SuperstructureState.GROUND_ALGE_INTAKE));
+    operator.povDown().onTrue(superstructure.runGoal(SuperstructureState.SYSTEM_STOW));
+    operator.povUp().onTrue(superstructure.runGoal(SuperstructureState.PROCESSOR));
+    operator.povLeft().onTrue(superstructure.runGoal(SuperstructureState.LIMBO_1_ALGE_INTAKE));
+    operator.povRight().onTrue(superstructure.runGoal(SuperstructureState.LIMBO_2_ALGE_INTAKE));
+    superstructureCoast
+        .onTrue(
+            Commands.runOnce(
+                    () -> {
+                      if (DriverStation.isDisabled()) {
+                        superstructureCoastOverride = true;
+                        Leds.getInstance().superstructureCoast = true;
+                      }
+                    })
+                .ignoringDisable(true))
+        .onFalse(
+            Commands.runOnce(
+                    () -> {
+                      superstructureCoastOverride = false;
+                      Leds.getInstance().superstructureCoast = false;
+                    })
+                .ignoringDisable(true));
+    RobotModeTriggers.disabled()
+        .onFalse(
+            Commands.runOnce(
+                    () -> {
+                      superstructureCoastOverride = false;
+                      Leds.getInstance().superstructureCoast = false;
+                    })
+                .ignoringDisable(true));
+
+    /*  // Strobe Leds.getInstance() at human player
+       operator
+           .b()
+           .whileTrue(
+               Commands.startEnd(
+                   () -> Leds.getInstance().hpAttentionAlert = true, () -> Leds.getInstance().hpAttentionAlert = false));
+    */
+    // Endgame Alerts
+    new Trigger(
+            () ->
+                DriverStation.isTeleopEnabled()
+                    && DriverStation.getMatchTime() > 0
+                    && DriverStation.getMatchTime() <= Math.round(endgameAlert1.get()))
+        .onTrue(
+            controllerRumbleCommand()
+                .withTimeout(0.5)
+                .beforeStarting(() -> Leds.getInstance().endgameAlert = true)
+                .finallyDo(() -> Leds.getInstance().endgameAlert = false));
+    new Trigger(
+            () ->
+                DriverStation.isTeleopEnabled()
+                    && DriverStation.getMatchTime() > 0
+                    && DriverStation.getMatchTime() <= Math.round(endgameAlert2.get()))
+        .onTrue(
+            controllerRumbleCommand()
+                .withTimeout(0.2)
+                .andThen(Commands.waitSeconds(0.1))
+                .repeatedly()
+                .withTimeout(0.9)
+                .beforeStarting(() -> Leds.getInstance().endgameAlert = true)
+                .finallyDo(() -> Leds.getInstance().endgameAlert = false)); // Rumble three times
   }
-
-  public Command CoralIntakeSequence() {
-    return Commands.startRun(
-            () -> {
-              algeManipulator.setAngle(AlgeManipulator.Goal.GROUND_ALGE_INTAKE);
-              algeManipulatorFlywheels.runVelocity(-1000);
-            },
-            () -> {
-              // detected =
-
-              // laserCan.laserDistance();
-            })
-        .until(() -> false)
-        .andThen(() -> {})
-        .andThen(() -> {});
+  // Creates controller rumble command
+  private Command controllerRumbleCommand() {
+    return Commands.startEnd(
+        () -> {
+          driver.getHID().setRumble(RumbleType.kBothRumble, 1.0);
+          operator.getHID().setRumble(RumbleType.kBothRumble, 1.0);
+        },
+        () -> {
+          driver.getHID().setRumble(RumbleType.kBothRumble, 0.0);
+          operator.getHID().setRumble(RumbleType.kBothRumble, 0.0);
+        });
   }
 
   /**
@@ -363,96 +408,6 @@ public class RobotContainer {
 
   private void Pathplanner() {
 
-    // Add a button to run the example auto to SmartDashboard, this will also be in the auto chooser
-    // built above
-    SmartDashboard.putData("Copy of L2 x 2 Net 1.2", new PathPlannerAuto("Copy of L2 x 2 Net 1.2"));
-    SmartDashboard.putData("Copy of L2 x 2 Net 1.3", new PathPlannerAuto("Copy of L2 x 2 Net 1.3"));
-    SmartDashboard.putData("Copy of L2 x 2 Net 2.2", new PathPlannerAuto("Copy of L2 x 2 Net 2.2"));
-    SmartDashboard.putData("Copy of L2 x 2 Net 2.3", new PathPlannerAuto("Copy of L2 x 2 Net 2.3"));
-    SmartDashboard.putData("Copy of L2 x 2 Net 2", new PathPlannerAuto("Copy of L2 x 2 Net 2"));
-    SmartDashboard.putData("Copy of L2 x 2 Net 3.2", new PathPlannerAuto("Copy of L2 x 2 Net 3.2"));
-    SmartDashboard.putData("Copy of L2 x 2 Net 3.3", new PathPlannerAuto("Copy of L2 x 2 Net 3.3"));
-    SmartDashboard.putData("Copy of L2 x 2 Net 3", new PathPlannerAuto("Copy of L2 x 2 Net 3"));
-    SmartDashboard.putData("Copy of L2 x 2 Net", new PathPlannerAuto("Copy of L2 x 2 Net"));
-    SmartDashboard.putData("Copy of L2 x 3 2", new PathPlannerAuto("Copy of L2 x 3 2"));
-    SmartDashboard.putData("Copy of L2 x 3 3", new PathPlannerAuto("Copy of L2 x 3 3"));
-    SmartDashboard.putData("Copy of L2 x 3", new PathPlannerAuto("Copy of L2 x 3"));
-    SmartDashboard.putData("Copy of L2 x 3 2", new PathPlannerAuto("Copy of L2 x 3 2"));
-    SmartDashboard.putData("Copy of L3 L4 Net 1.2", new PathPlannerAuto("Copy of L3 L4 Net 1.2"));
-    SmartDashboard.putData("Copy of L3 L4 Net 1.3", new PathPlannerAuto("Copy of L3 L4 Net 1.3"));
-    SmartDashboard.putData("Copy of L3 L4 Net 2.2", new PathPlannerAuto("Copy of L3 L4 Net 2.2"));
-    SmartDashboard.putData("Copy of L3 L4 Net 2", new PathPlannerAuto("Copy of L3 L4 Net 2"));
-    SmartDashboard.putData("Copy of L3 L4 Net 3.2", new PathPlannerAuto("Copy of L3 L4 Net 3.2"));
-    SmartDashboard.putData("Copy of L3 L4 Net 2.3", new PathPlannerAuto("Copy of L3 L4 Net 2.3"));
-    SmartDashboard.putData("Copy of L3 L4 Net 3.3", new PathPlannerAuto("Copy of L3 L4 Net 3"));
-    SmartDashboard.putData("Copy of L3 L4 Net 3", new PathPlannerAuto("Copy of L3 L4 Net 3"));
-    SmartDashboard.putData("Copy of L3 L4 Net", new PathPlannerAuto("Copy of L3 L4 Net"));
-    SmartDashboard.putData(
-        "Copy of L3 x 2 L4 x 1 2", new PathPlannerAuto("Copy of L3 x 2 L4 x 1 2"));
-    SmartDashboard.putData(
-        "Copy of L3 x 1 L4 x 2 3", new PathPlannerAuto("Copy of L3 x 1 L4 x 2 3"));
-    SmartDashboard.putData("Copy of L3 x 2 L4 x 1", new PathPlannerAuto("Copy of L3 x 2 L4 x 1"));
-    SmartDashboard.putData(
-        "Copy of L3 x 2 L4 x 1 3", new PathPlannerAuto("Copy of L3 x 2 L4 x 1 3"));
-    SmartDashboard.putData(
-        "Copy of L3 x 1 L4 x 2 2", new PathPlannerAuto("Copy of L3 x 1 L4 x 2 2"));
-    SmartDashboard.putData("Copy of L3 x 1 L4 x 2", new PathPlannerAuto("Copy of L3 x 1 L4 x 2"));
-    SmartDashboard.putData("Copy of L4 x 2 Net 2.2", new PathPlannerAuto("Copy of L4 x 2 Net 2.2"));
-    SmartDashboard.putData("Copy of L4 x 2 Net 1.2", new PathPlannerAuto("Copy of L4 x 2 Net 1.2"));
-    SmartDashboard.putData("Copy of L4 x 2 Net 1.3", new PathPlannerAuto("Copy of L4 x 2 Net 1.3"));
-    SmartDashboard.putData("Copy of L4 x 2 Net 2.2", new PathPlannerAuto("Copy of L4 x 2 Net 2.2"));
-    SmartDashboard.putData("Copy of L4 x 2 Net 1.2", new PathPlannerAuto("Copy of L4 x 2 Net 1.2"));
-    SmartDashboard.putData("Copy of L4 x 2 Net 1.3", new PathPlannerAuto("Copy of L4 x 2 Net 1.3"));
-    SmartDashboard.putData("Copy of L3 x 3 3", new PathPlannerAuto("Copy of L3 x 3 3"));
-    SmartDashboard.putData("Copy of L3 x 3", new PathPlannerAuto("Copy of L3 x 3"));
-    SmartDashboard.putData("Copy of L3 x 3 2", new PathPlannerAuto("Copy of L3 x 3 2"));
-    SmartDashboard.putData("L2 x 2 Net 2.2", new PathPlannerAuto("L2 x 2 Net 2.2"));
-    SmartDashboard.putData("L2 x 2 Net 1.3", new PathPlannerAuto("L2 x 2 Net 1.3"));
-    SmartDashboard.putData("L2 x 2 Net 1.2", new PathPlannerAuto("L2 x 2 Net 1.2"));
-    SmartDashboard.putData("Copy of L4 x 3", new PathPlannerAuto("Copy of L4 x 3"));
-    SmartDashboard.putData("Copy of L4 x 3 3", new PathPlannerAuto("Copy of L4 x 3 3"));
-    SmartDashboard.putData("Copy of L4 x 2 Net 2.3", new PathPlannerAuto("Copy of L4 x 2 Net 2.3"));
-    SmartDashboard.putData("Copy of L4 x 3 2", new PathPlannerAuto("Copy of L4 x 3 2"));
-    SmartDashboard.putData("L2 x 3 2", new PathPlannerAuto("L2 x 3 2"));
-    SmartDashboard.putData("L2 x 2 Net", new PathPlannerAuto("L2 x 2 Net"));
-    SmartDashboard.putData("L2 x 2 Net 3.3", new PathPlannerAuto("L2 x 2 Net 3.3"));
-    SmartDashboard.putData("L2 x 2 Net 3", new PathPlannerAuto("L2 x 2 Net 3"));
-    SmartDashboard.putData("L2 x 2 Net 3.2", new PathPlannerAuto("L2 x 2 Net 3.2"));
-    SmartDashboard.putData("L2 x 2 Net 2", new PathPlannerAuto("L2 x 2 Net 2"));
-    SmartDashboard.putData("L2 x 2 Net 2.3", new PathPlannerAuto("L2 x 2 Net 2.3"));
-    SmartDashboard.putData("L3 L4 Net 2", new PathPlannerAuto("L3 L4 Net 2"));
-    SmartDashboard.putData("L3 L4 Net 2.3", new PathPlannerAuto("L3 L4 Net 2.3"));
-    SmartDashboard.putData("L3 L4 Net 2.2", new PathPlannerAuto("L3 L4 Net 2.2"));
-    SmartDashboard.putData("L2 x 3", new PathPlannerAuto("L2 x 3"));
-    SmartDashboard.putData("L3 L4 Net 1.2", new PathPlannerAuto("L3 L4 Net 1.2"));
-    SmartDashboard.putData("L2 x 3 3", new PathPlannerAuto("L2 x 3 3"));
-    SmartDashboard.putData("L3 L4 Net 1.3", new PathPlannerAuto("L3 L4 Net 1.3"));
-    SmartDashboard.putData("L3 L4 Net 3.2", new PathPlannerAuto("L3 L4 Net 3.2"));
-    SmartDashboard.putData("L3 L4 Net 3.3", new PathPlannerAuto("L3 L4 Net 3.3"));
-    SmartDashboard.putData("L3 L4 Net 3", new PathPlannerAuto("L3 L4 Net 3"));
-    SmartDashboard.putData("L3 L4 Net", new PathPlannerAuto("L3 L4 Net"));
-    SmartDashboard.putData("L3 x 1 L4 x 2 2", new PathPlannerAuto("L3 x 1 L4 x 2 2"));
-    SmartDashboard.putData("L3 x 1 L4 x 2 3", new PathPlannerAuto("L3 x 1 L4 x 2 3"));
-    SmartDashboard.putData("L3 x 1 L4 x 2", new PathPlannerAuto("L3 x 1 L4 x 2"));
-    SmartDashboard.putData("L3 x 2 L4 x 1 2", new PathPlannerAuto("L3 x 2 L4 x 1 2"));
-    SmartDashboard.putData("L3 x 2 L4 x 1 3", new PathPlannerAuto("L3 x 2 L4 x 1 3"));
-    SmartDashboard.putData("L3 x 2 L4 x 1", new PathPlannerAuto("L3 x 2 L4 x 1"));
-    SmartDashboard.putData("L3 x 3 2", new PathPlannerAuto("L3 x 3 2"));
-    SmartDashboard.putData("L3 x 3 3", new PathPlannerAuto("L3 x 3 3"));
-    SmartDashboard.putData("L3 x 3", new PathPlannerAuto("L3 x 3"));
-    SmartDashboard.putData("L3 x 3 3", new PathPlannerAuto("L3 x 3 3"));
-    SmartDashboard.putData("L3 x 3", new PathPlannerAuto("L3 x 3"));
-    SmartDashboard.putData("L4 x 2 Net 1.2", new PathPlannerAuto("L4 x 2 Net 1.2"));
-    SmartDashboard.putData("L4 x 2 Net 1.3", new PathPlannerAuto("L4 x 2 Net 1.3"));
-    SmartDashboard.putData("L4 x 2 Net 2.3", new PathPlannerAuto("L4 x 2 Net 2.3"));
-    SmartDashboard.putData("L4 X 2 Net 2", new PathPlannerAuto("L4 X 2 Net 2"));
-    SmartDashboard.putData("L4 x 2 Net 3.2", new PathPlannerAuto("L4 x 2 Net 3.2"));
-    SmartDashboard.putData("L4 x 2 Net 3.3", new PathPlannerAuto("L4 x 2 Net 3.3"));
-    SmartDashboard.putData("L4 x 2 Net 3", new PathPlannerAuto("L4 x 2 Net 3"));
-    SmartDashboard.putData("L4 x 3 2", new PathPlannerAuto("L4 x 3 2"));
-    SmartDashboard.putData("L4 x 3 2", new PathPlannerAuto("L4 x 3 3"));
-    SmartDashboard.putData("L4 x 3", new PathPlannerAuto("L4 x 3"));
-
     // Add a button to SmartDashboard that will create and follow an on-the-fly path
     // This example will simply move the robot 2m forward of its current position
     SmartDashboard.putData(
@@ -486,7 +441,7 @@ public class RobotContainer {
     SmartDashboard.putData(
         "Pathfind to Pickup Pos",
         AutoBuilder.pathfindToPose(
-            new Pose2d(14.77, 1.25, Rotation2d.fromDegrees(-140)),
+            new Pose2d(1.501, 7.0906, Rotation2d.fromDegrees(162)),
             new PathConstraints(4.0, 4.0, Units.degreesToRadians(360), Units.degreesToRadians(540)),
             0));
 

@@ -25,7 +25,6 @@ public class AlgeManipulatorIOKrakenFOC implements AlgeManipulatorIO {
   private final TalonFX talon;
 
   // Status Signals
-
   // Status signal for the internal position of the arm in rotations, retrieved from the leader
   // TalonFX
   private final StatusSignal<Angle> internalPositionRotations;

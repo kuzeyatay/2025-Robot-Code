@@ -1,9 +1,11 @@
-package frc.robot.subsystems.superstructure.coralFlywheels;
+package frc.robot.subsystems.genericFlywheels;
 
 import static frc.robot.util.SparkUtil.*;
 
+import com.revrobotics.AbsoluteEncoder;
 import com.revrobotics.RelativeEncoder;
 import com.revrobotics.spark.ClosedLoopSlot;
+import com.revrobotics.spark.SparkBase;
 import com.revrobotics.spark.SparkBase.ControlType;
 import com.revrobotics.spark.SparkBase.PersistMode;
 import com.revrobotics.spark.SparkBase.ResetMode;
@@ -12,39 +14,63 @@ import com.revrobotics.spark.SparkClosedLoopController.ArbFFUnits;
 import com.revrobotics.spark.SparkLowLevel.MotorType;
 import com.revrobotics.spark.SparkMax;
 import com.revrobotics.spark.config.ClosedLoopConfig.FeedbackSensor;
+import com.revrobotics.spark.config.SparkBaseConfig;
 import com.revrobotics.spark.config.SparkMaxConfig;
 import edu.wpi.first.math.util.Units;
 
 /**
  * FlywheelIOSparkMax is a hardware implementation of the FlywheelIO interface, using two NEO motors
- * controlled by SPARK MAX controllers. The leader motor is directly controlled, while the follower
- * motor mirrors the leader. This class configures the motors, handles sensor feedback (encoder),
- * and provides methods to control the flywheel in both open-loop and closed-loop modes.
+ * controlled by SPARK MAX controllers. The spark motor is directly controlled, while the follower
+ * motor mirrors the spark. This class configures the motors, handles sensor feedback (encoder), and
+ * provides methods to control the flywheel in both open-loop and closed-loop modes.
  */
-public class CoralFlywheelsSparkMax implements CoralFlywheelsIO {
+public class GenericFlywheelsIOSparkMax implements GenericFlywheelsIO {
   // Defines the gear ratio for the flywheel mechanism (if any)
-  private static final double GEAR_RATIO = 20 / 15;
+  private double GEAR_RATIO = 42 / 18;
+  private boolean brakeModeEnabled = true;
+  private boolean isAbsoluteConnected = false;
+  private AbsoluteEncoder absoluteEncoder;
 
-  // Creates a SPARK MAX controller for the leader motor, using a Brushless NEO
-  private final SparkMax leader = new SparkMax(17, MotorType.kBrushless);
+  // Creates a SPARK MAX controller for the spark motor, using a Brushless NEO
+  private final SparkMax spark;
 
-  // Retrieves a RelativeEncoder from the leader motor controller
-  private final RelativeEncoder encoder = leader.getEncoder();
+  // Retrieves a RelativeEncoder from the spark motor controller
+  private final RelativeEncoder encoder;
 
-  // Retrieves a SparkClosedLoopController for closed-loop (PID) control from the leader controller
-  private final SparkClosedLoopController conroller = leader.getClosedLoopController();
+  // Retrieves a SparkClosedLoopController for closed-loop (PID) control from the spark controller
+  private final SparkClosedLoopController conroller;
 
   // Configuration object for the SPARK MAX controllers
   private final SparkMaxConfig config = new SparkMaxConfig();
 
   /**
    * Constructor sets up the SPARK MAX controllers and configures parameters such as voltage
-   * compensation and current limit. It also applies the configurations to both leader and follower
+   * compensation and current limit. It also applies the configurations to both spark and follower
    * controllers.
    */
-  public CoralFlywheelsSparkMax() {
+  public GenericFlywheelsIOSparkMax(int deviceId, double GEAR_RATIO, boolean isAbsoluteConnected) {
+    this.GEAR_RATIO = GEAR_RATIO;
+    this.isAbsoluteConnected = isAbsoluteConnected;
     // Configure voltage compensation and current limits on the SPARK MAX controllers
+
+    // Creates a SPARK MAX controller for the spark motor, using a Brushless NEO
+    spark = new SparkMax(deviceId, MotorType.kBrushless);
+
+    // Retrieves a RelativeEncoder from the spark motor controller
+    encoder = spark.getEncoder();
+
+    // Retrieves a SparkClosedLoopController for closed-loop (PID) control from the spark controller
+    conroller = spark.getClosedLoopController();
+
+    if (isAbsoluteConnected) {
+      absoluteEncoder = spark.getAbsoluteEncoder();
+
+      config.absoluteEncoder.positionConversionFactor(93.93).inverted(false);
+    }
+
     config.voltageCompensation(12.0).smartCurrentLimit(40);
+    config.idleMode(
+        brakeModeEnabled ? SparkBaseConfig.IdleMode.kBrake : SparkBaseConfig.IdleMode.kCoast);
     config
         .closedLoop
         .feedbackSensor(FeedbackSensor.kPrimaryEncoder)
@@ -57,12 +83,12 @@ public class CoralFlywheelsSparkMax implements CoralFlywheelsIO {
         // Limit output from -1 to 1 (full reverse to full forward)
         .outputRange(-1, 1);
 
-    // Apply the configuration to the leader motor with retries (using SparkUtil's tryUntilOk)
+    // Apply the configuration to the spark motor with retries (using SparkUtil's tryUntilOk)
     tryUntilOk(
-        leader,
+        spark,
         5,
         () ->
-            leader.configure(
+            spark.configure(
                 config, ResetMode.kResetSafeParameters, PersistMode.kPersistParameters));
   }
 
@@ -73,17 +99,21 @@ public class CoralFlywheelsSparkMax implements CoralFlywheelsIO {
    * @param inputs The FlywheelIOInputs instance to populate with current data.
    */
   @Override
-  public void updateInputs(CoralFlywheelsIOInputs inputs) {
+  public void updateInputs(GenericFlywheelsIOInputs inputs) {
     // Convert the encoder's position from rotations to radians, dividing by GEAR_RATIO if necessary
     inputs.positionRad = Units.rotationsToRadians(encoder.getPosition() / GEAR_RATIO);
     // Convert the encoder's velocity from RPM to rad/s, dividing by GEAR_RATIO if necessary
     inputs.velocityRadPerSec =
         Units.rotationsPerMinuteToRadiansPerSecond(encoder.getVelocity() / GEAR_RATIO);
-    // Calculate the applied voltage to the leader motor by multiplying output percentage by bus
+    // Calculate the applied voltage to the spark motor by multiplying output percentage by bus
     // voltage
-    inputs.appliedVolts = leader.getAppliedOutput() * leader.getBusVoltage();
-    // Retrieve the output currents from both the leader and follower motors
-    inputs.currentAmps = new double[] {leader.getOutputCurrent()};
+    inputs.appliedVolts = spark.getAppliedOutput() * spark.getBusVoltage();
+    // Retrieve the output currents from both the spark and follower motors
+    inputs.currentAmps = new double[] {spark.getOutputCurrent()};
+
+    if (isAbsoluteConnected) {
+      inputs.encoderPositionRad = absoluteEncoder.getPosition() - 35;
+    }
   }
 
   /**
@@ -94,7 +124,7 @@ public class CoralFlywheelsSparkMax implements CoralFlywheelsIO {
    */
   @Override
   public void setVoltage(double volts) {
-    leader.setVoltage(volts);
+    spark.setVoltage(volts);
   }
 
   /**
@@ -121,7 +151,7 @@ public class CoralFlywheelsSparkMax implements CoralFlywheelsIO {
    */
   @Override
   public void stop() {
-    leader.stopMotor();
+    spark.stopMotor();
   }
 
   /**
@@ -140,10 +170,30 @@ public class CoralFlywheelsSparkMax implements CoralFlywheelsIO {
      */
 
     tryUntilOk(
-        leader,
+        spark,
         5,
         () ->
-            leader.configure(
+            spark.configure(
                 config, ResetMode.kResetSafeParameters, PersistMode.kPersistParameters));
+  }
+
+  @Override
+  public void setBrakeMode(boolean enabled) {
+    if (brakeModeEnabled == enabled) return;
+    brakeModeEnabled = enabled;
+    new Thread(
+            () ->
+                tryUntilOk(
+                    spark,
+                    5,
+                    () ->
+                        spark.configure(
+                            config.idleMode(
+                                brakeModeEnabled
+                                    ? SparkBaseConfig.IdleMode.kBrake
+                                    : SparkBaseConfig.IdleMode.kCoast),
+                            SparkBase.ResetMode.kNoResetSafeParameters,
+                            SparkBase.PersistMode.kNoPersistParameters)))
+        .start();
   }
 }

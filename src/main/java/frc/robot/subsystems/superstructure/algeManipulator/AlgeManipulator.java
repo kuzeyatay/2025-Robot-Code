@@ -5,17 +5,21 @@ import static frc.robot.subsystems.superstructure.algeManipulator.AlgeManipulato
 
 import edu.wpi.first.math.MathUtil;
 import edu.wpi.first.math.controller.ArmFeedforward;
+import edu.wpi.first.math.controller.SimpleMotorFeedforward;
 import edu.wpi.first.math.filter.Debouncer;
 import edu.wpi.first.math.trajectory.TrapezoidProfile;
 import edu.wpi.first.math.util.Units;
 import edu.wpi.first.wpilibj.DriverStation;
-import edu.wpi.first.wpilibj.util.Color;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.Commands;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
 import edu.wpi.first.wpilibj2.command.sysid.SysIdRoutine;
 import frc.robot.ModeSetter;
 import frc.robot.ModeSetter.Mode;
+import frc.robot.subsystems.genericFlywheels.GenericFlywheelsIO;
+import frc.robot.subsystems.genericFlywheels.GenericFlywheelsIOInputsAutoLogged;
+import frc.robot.subsystems.laserCan.LaserCanIO;
+import frc.robot.subsystems.laserCan.LaserCanIOInputsAutoLogged;
 import frc.robot.util.EqualsUtil;
 import frc.robot.util.LoggedTunableNumber;
 import java.util.function.BooleanSupplier;
@@ -53,6 +57,7 @@ public class AlgeManipulator extends SubsystemBase {
   private static final LoggedTunableNumber homingVelocityThresh =
       new LoggedTunableNumber("Alge Manipulator", 0.1);
   private Debouncer homingDebouncer = new Debouncer(homingTimeSecs.get());
+  private Goal currentGoal = Goal.STOW;
 
   // Define tunable maximum velocity and acceleration for arm motion constraints
   private static final LoggedTunableNumber maxVelocity =
@@ -82,16 +87,14 @@ public class AlgeManipulator extends SubsystemBase {
   private boolean brakeModeEnabled = true;
 
   public static double homedPosition = 0.0;
+  // IO interface for controlling and reading from the flywheel hardware
+  private final GenericFlywheelsIO flywheelIO;
+  private final GenericFlywheelsIOInputsAutoLogged flywheelInputs =
+      new GenericFlywheelsIOInputsAutoLogged();
 
-  @Getter
-  @RequiredArgsConstructor
-  public enum Goaly {
-    IDLE(() -> 0.0, false),
-    SLAM_UP(slamUpCurrent, true);
-
-    private final DoubleSupplier slamCurrent;
-    private final boolean retracted;
-  }
+  private final SimpleMotorFeedforward flywheelFFModel;
+  private LaserCanIO laserIO;
+  private final LaserCanIOInputsAutoLogged laserInputs = new LaserCanIOInputsAutoLogged();
 
   // Flag to indicate if the arm is in characterization mode
   private boolean characterizing = false;
@@ -117,15 +120,16 @@ public class AlgeManipulator extends SubsystemBase {
   public enum Goal {
     // Define the STOW goal with an angle of 0 degrees
     STOW(() -> -3),
+    BACKWARDS_STOW(() -> -8),
     // Define ANGLE1 goal with a tunable setpoint of 45 degrees
-    GROUND_ALGE_INTAKE(new LoggedTunableNumber("Alge Manipulator/Ground intake for alge", 0.0)),
-    L1(new LoggedTunableNumber("Alge Manipulator/L1", 0.0)),
-    PROCESSOR(new LoggedTunableNumber("Alge Manipulator/Processor", 95)),
-    NET(new LoggedTunableNumber("Alge Manipulator/Net", 0.0)),
+    GROUND_INTAKE(new LoggedTunableNumber("Alge Manipulator/Ground intake for alge", 90)),
+    LIMBO_1(new LoggedTunableNumber("Alge Manipulator/L2_L3", 50)),
+    LIMBO_2(new LoggedTunableNumber("Alge Manipulator/L3_L4", 50.0)),
+    PROCESSOR(new LoggedTunableNumber("Alge Manipulator/Processor", 65)),
+    NET(new LoggedTunableNumber("Alge Manipulator/Net", 48)),
     EJECT(new LoggedTunableNumber("Alge Manipulator/Eject", 0.0)),
     SKYFALL(new LoggedTunableNumber("Alge Manipulator/Skyfall", 0.0)), // Drop alge from reef
-    CA(new LoggedTunableNumber("Alge Manipulator/Coral on top of alge", 0.0)),
-    GROUND_CORAL_INTAKE(new LoggedTunableNumber("Alge Manipulator/Ground intake for coral", 0.0));
+    CA(new LoggedTunableNumber("Alge Manipulator/Coral on top of alge", 0.0));
 
     // Supplier to provide the arm setpoint in degrees
     private final DoubleSupplier armSetpointSupplier;
@@ -133,6 +137,28 @@ public class AlgeManipulator extends SubsystemBase {
     // Method to get the setpoint in radians
     private double getRads() {
       return Units.degreesToRadians(armSetpointSupplier.getAsDouble());
+    }
+  }
+
+  // Define an enumeration for different arm goals with corresponding setpoints
+  @RequiredArgsConstructor
+  public enum flywheelGoal {
+    // Define the STOW goal with an angle of 0 degrees
+    STOW(() -> 0),
+    // Define ANGLE1 goal with a tunable setpoint of 45 degrees
+    INTAKE(new LoggedTunableNumber("Alge Manipulator Flywheels/Ground intake for alge", -2000)),
+    PROCESSOR(new LoggedTunableNumber("Alge Manipulator Flywheels/Processor", 2000)),
+    NET(new LoggedTunableNumber("Alge Manipulator Flywheels/Net", -6000)),
+    EJECT(new LoggedTunableNumber("Alge Manipulator Flywheels/Eject", 3000)),
+    SKYFALL(
+        new LoggedTunableNumber("Alge Manipulator Flywheels/Skyfall", 3000)); // Drop alge from reef
+
+    // Supplier to provide the arm setpoint in degrees
+    private final DoubleSupplier flywheelRPM;
+
+    // Method to get the setpoint in radians
+    public DoubleSupplier getRPM() {
+      return flywheelRPM;
     }
   }
 
@@ -153,11 +179,6 @@ public class AlgeManipulator extends SubsystemBase {
   // Current state of the motion profile
   private TrapezoidProfile.State setpointState = new TrapezoidProfile.State();
 
-  // Visualizers for measuring, setpoint, and goal positions
-  private final AlgeManipulatorVisualizer measuredVisualizer;
-  private final AlgeManipulatorVisualizer setpointVisualizer;
-  private final AlgeManipulatorVisualizer goalVisualizer;
-
   // Flag to track if the arm was not in autonomous mode
   private boolean wasNotAuto = false;
 
@@ -165,9 +186,11 @@ public class AlgeManipulator extends SubsystemBase {
   public ArmFeedforward ff;
 
   // Constructor for the Arm class, initializing IO and controllers
-  public AlgeManipulator(AlgeManipulatorIO io) {
+  public AlgeManipulator(AlgeManipulatorIO io, GenericFlywheelsIO flywheelIO, LaserCanIO laserIO) {
     io.zero();
     this.io = io;
+    this.flywheelIO = flywheelIO;
+    this.laserIO = laserIO;
 
     setAngle(homedPosition);
     // Set brake mode to enabled initially
@@ -186,10 +209,31 @@ public class AlgeManipulator extends SubsystemBase {
         new TrapezoidProfile(
             new TrapezoidProfile.Constraints(maxVelocity.get(), maxAcceleration.get()));
 
-    // Initialize visualizers with specific colors
-    measuredVisualizer = new AlgeManipulatorVisualizer("Measured", Color.kBlack);
-    setpointVisualizer = new AlgeManipulatorVisualizer("Setpoint", Color.kGreen);
-    goalVisualizer = new AlgeManipulatorVisualizer("Goal", Color.kBlue);
+    // Flywheel Setup
+
+    // Configure PID and feedforward gains based on the robot's current mode
+    // The simulation mode may require different tuning than the real hardware
+    switch (ModeSetter.currentMode) {
+      case REAL:
+        flywheelFFModel = new SimpleMotorFeedforward(0.0001, 0.000195, 0.0003);
+        flywheelIO.configurePID(0.8, 0.0, 0.0);
+        break;
+      case REPLAY:
+        // On real hardware or replay mode, use these gains
+        flywheelFFModel = new SimpleMotorFeedforward(0.0001, 0.000195, 0.0003);
+        flywheelIO.configurePID(1.0, 0.0, 0.0);
+        break;
+      case SIM:
+        // In simulation, use different feedforward and PID gains to achieve stable behavior in the
+        // model
+        flywheelFFModel = new SimpleMotorFeedforward(0.01, 0.00103, 0.0);
+        flywheelIO.configurePID(0.4, 0.0, 0.0);
+        break;
+      default:
+        // Default or unrecognized mode uses zero gains
+        flywheelFFModel = new SimpleMotorFeedforward(0.0, 0.0);
+        break;
+    }
   }
 
   // Method to set override suppliers for disabling, coasting, and half stowing the arm
@@ -234,8 +278,13 @@ public class AlgeManipulator extends SubsystemBase {
   public void periodic() {
     // Update IO inputs
     io.updateInputs(inputs);
+    flywheelIO.updateInputs(flywheelInputs);
+    laserIO.updateInputs(laserInputs);
+
     // Process inputs for logging
     Logger.processInputs("Alge Manipulator", inputs);
+    Logger.processInputs("Alge Flywheels", flywheelInputs);
+    Logger.processInputs("Alge LaserCan", laserInputs);
 
     // Update brake mode based on coast supplier
     setBrakeMode(!coastSupplier.getAsBoolean());
@@ -287,17 +336,10 @@ public class AlgeManipulator extends SubsystemBase {
       // If stowing and at the minimum angle and at goal, stop the motor
 
       // Run the setpoint with calculated feedforward
-
-      // Update the goal visualizer with the current goal angle
-      goalVisualizer.update(goalAngle);
+      io.runSetpoint(currentGoal.getRads(), 0);
       // Record the goal angle for logging
       Logger.recordOutput("Alge Manipulator/GoalAngle", goalAngle);
     }
-
-    // Update the measured visualizer with the current position
-    measuredVisualizer.update(inputs.positionRads);
-    // Update the setpoint visualizer with the current setpoint position
-    setpointVisualizer.update(setpointState.position);
 
     // Record various outputs for logging
     Logger.recordOutput("Alge Manipulator/SetpointAngle", setpointState.position);
@@ -323,32 +365,12 @@ public class AlgeManipulator extends SubsystemBase {
         inputs.positionRads, Units.degreesToRadians(AlgeManipulator.lowerLimitDegrees.get()), 1e-3);
   }
 
-  public Command sysIdQuasistatic(SysIdRoutine.Direction direction) {
-    return routine.quasistatic(direction);
-  }
-
-  public Command sysIdDynamic(SysIdRoutine.Direction direction) {
-    return routine.dynamic(direction);
-  }
-
-  public void quastaticTest() {
-    sysIdQuasistatic(SysIdRoutine.Direction.kForward)
-        .until(() -> motorHasReachedForwardLimit())
-        .andThen(
-            sysIdQuasistatic(SysIdRoutine.Direction.kReverse)
-                .until(() -> motorHasReachedForwardLimit()));
-  }
-
-  public void dynamicTest() {
-    sysIdQuasistatic(SysIdRoutine.Direction.kForward)
-        .until(() -> motorHasReachedForwardLimit())
-        .andThen(
-            sysIdQuasistatic(SysIdRoutine.Direction.kForward)
-                .until(() -> motorHasReachedBackwardsLimit()));
-  }
-
   public void setAngle(Goal goal) {
-    io.runSetpoint(goal.getRads() + goalAngle, 0);
+    setGoal(goal);
+    if (EqualsUtil.epsilonEquals(goal.getRads(), 0, 0.009)) {
+      homed = true;
+    } else homed = false;
+    currentGoal = goal;
   }
 
   public void setAngle(double goal) {
@@ -380,26 +402,54 @@ public class AlgeManipulator extends SubsystemBase {
         .finallyDo(() -> io.zero());
   }
 
-  public Command slamUp() {
-    return Commands.startRun(
-            () -> {
-              io.runTorqueCurrent(slamUpCurrent.getAsDouble());
-            },
-            () -> {
-              homed =
-                  homingDebouncer.calculate(
-                      Math.abs(inputs.velocityRadsPerSec) <= homingVelocityThresh.get());
-              homedPosition = inputs.positionRads;
-            })
-        .until(() -> homed)
-        .andThen(
-            () -> {
-              homed = true;
-            })
-        .finallyDo(
-            () -> {
-              io.zero();
-              io.stop();
-            });
+  // Flywheels
+
+  /**
+   * Runs the flywheel open-loop at the specified voltage.
+   *
+   * @param volts The voltage command to apply to the flywheel motor(s).
+   */
+  public void runFlywheelVolts(double volts) {
+    flywheelIO.setVoltage(volts);
+  }
+
+  /**
+   * Runs the flywheel closed-loop to achieve a specified velocity in RPM.
+   *
+   * @param velocityRPM The target flywheel velocity in rotations per minute (RPM).
+   */
+  public void runFlywheelVelocity(double velocityRPM) {
+    // Convert velocity from RPM to radians per second for internal calculations
+    var velocityRadPerSec = Units.rotationsPerMinuteToRadiansPerSecond(velocityRPM);
+
+    // Calculate the feedforward voltage using the feedforward model and the current velocity
+    // This helps the motor controller achieve the desired speed more effectively
+    flywheelIO.setVelocity(
+        velocityRadPerSec,
+        flywheelFFModel.calculateWithVelocities(
+            flywheelInputs.velocityRadPerSec, velocityRadPerSec));
+
+    // Log the commanded setpoint RPM for telemetry
+    Logger.recordOutput("Coral Flywheel/SetpointRPM", velocityRPM);
+  }
+
+  /** Stops the flywheel by halting motor outputs. */
+  public void stopFlywheels() {
+    flywheelIO.stop();
+  }
+
+  /**
+   * Returns the current velocity of the flywheel in RPM.
+   *
+   * @return The current flywheel speed in rotations per minute.
+   */
+  @AutoLogOutput
+  public double getFlywheelVelocityRPM() {
+    // Converts radians per second to RPM for more human-readable units
+    return Units.radiansPerSecondToRotationsPerMinute(flywheelInputs.velocityRadPerSec);
+  }
+
+  public double getLaserDistance() {
+    return laserInputs.m_distance;
   }
 }

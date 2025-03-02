@@ -1,18 +1,18 @@
-package frc.robot.subsystems.superstructure.coralFlywheels;
+package frc.robot.subsystems.genericFlywheels;
 
 import edu.wpi.first.math.MathUtil;
 import edu.wpi.first.math.controller.PIDController;
 import edu.wpi.first.math.system.plant.DCMotor;
 import edu.wpi.first.math.system.plant.LinearSystemId;
 import edu.wpi.first.wpilibj.simulation.FlywheelSim;
-import frc.robot.subsystems.superstructure.coralFlywheels.CoralFlywheelsIO.CoralFlywheelsIOInputs;
+import frc.robot.subsystems.genericFlywheels.GenericFlywheelsIO.GenericFlywheelsIOInputs;
 
 /**
  * FlywheelIOSim is a simulated implementation of the FlywheelIO interface. It uses WPILib's
  * FlywheelSim class to model the behavior of a flywheel in a simulation environment, allowing for
  * testing and tuning of control logic without actual hardware.
  */
-public class CoralFlywheelsSim implements CoralFlywheelsIO {
+public class GenericFlywheelsIOSim implements GenericFlywheelsIO {
   // Creates a FlywheelSim instance, modeling a flywheel with NEO motor and given moment of inertia
   // and gearing
   private FlywheelSim sim =
@@ -36,7 +36,7 @@ public class CoralFlywheelsSim implements CoralFlywheelsIO {
    * @param inputs The FlywheelIOInputs instance to populate with current simulation data.
    */
   @Override
-  public void updateInputs(CoralFlywheelsIOInputs inputs) {
+  public void updateInputs(GenericFlywheelsIOInputs inputs) {
     // If running in closed-loop mode, compute the output using PID and feedforward, then apply the
     // voltage
     if (closedLoop) {

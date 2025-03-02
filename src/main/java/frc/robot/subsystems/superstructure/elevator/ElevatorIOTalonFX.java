@@ -14,11 +14,14 @@ import com.ctre.phoenix6.StatusSignal;
 import com.ctre.phoenix6.configs.Slot0Configs;
 import com.ctre.phoenix6.configs.TalonFXConfiguration;
 import com.ctre.phoenix6.controls.Follower;
+import com.ctre.phoenix6.controls.MotionMagicExpoDutyCycle;
+import com.ctre.phoenix6.controls.MotionMagicExpoVoltage;
 import com.ctre.phoenix6.controls.PositionTorqueCurrentFOC;
 import com.ctre.phoenix6.controls.TorqueCurrentFOC;
 import com.ctre.phoenix6.controls.VoltageOut;
 import com.ctre.phoenix6.hardware.ParentDevice;
 import com.ctre.phoenix6.hardware.TalonFX;
+import com.ctre.phoenix6.signals.GravityTypeValue;
 import com.ctre.phoenix6.signals.InvertedValue;
 import com.ctre.phoenix6.signals.NeutralModeValue;
 import edu.wpi.first.math.filter.Debouncer;
@@ -52,6 +55,8 @@ public class ElevatorIOTalonFX implements ElevatorIO {
       new PositionTorqueCurrentFOC(0.0).withUpdateFreqHz(0.0);
   private final VoltageOut voltageRequest = new VoltageOut(0.0).withUpdateFreqHz(0.0);
 
+  public MotionMagicExpoDutyCycle posCon = new MotionMagicExpoDutyCycle(0);
+
   public ElevatorIOTalonFX() {
     talon = new TalonFX(ElevatorConstants.leaderID, "rio");
     // Initializes the follower TalonFX with the same ID (this will follow the leader)
@@ -60,11 +65,25 @@ public class ElevatorIOTalonFX implements ElevatorIO {
 
     // Configure motor
     config.MotorOutput.NeutralMode = NeutralModeValue.Brake;
-    config.Slot0 = new Slot0Configs().withKP(0).withKI(0).withKD(0);
+
+    config.Slot0 =
+        new Slot0Configs()
+            .withKP(0)
+            .withKI(0)
+            .withKD(0)
+            .withGravityType(GravityTypeValue.Elevator_Static)
+            .withKS(0.015)
+            .withKV(0.0)
+            .withKG(0.045);
+
+    config.MotionMagic.MotionMagicCruiseVelocity = 1000;
+    config.MotionMagic.MotionMagicAcceleration = 250;
+    config.MotionMagic.MotionMagicJerk = 2500;
+
     config.Feedback.SensorToMechanismRatio = ElevatorConstants.elevatorGearRatio;
-    config.TorqueCurrent.PeakForwardTorqueCurrent = 80.0;
-    config.TorqueCurrent.PeakReverseTorqueCurrent = -80;
-    config.CurrentLimits.StatorCurrentLimit = 80.0;
+    config.TorqueCurrent.PeakForwardTorqueCurrent = 60.0;
+    config.TorqueCurrent.PeakReverseTorqueCurrent = -60;
+    config.CurrentLimits.StatorCurrentLimit = 60.0;
     config.CurrentLimits.StatorCurrentLimitEnable = true;
     config.MotorOutput.Inverted = InvertedValue.Clockwise_Positive;
     config.MotorOutput.DutyCycleNeutralDeadband = 0.02;
@@ -127,11 +146,12 @@ public class ElevatorIOTalonFX implements ElevatorIO {
 
   @Override
   public void runPosition(double positionRad, double feedforward) {
+    // Create a new MotionMagicVoltage control request with initial output of 0 volts
+    final MotionMagicExpoVoltage request = new MotionMagicExpoVoltage(0);
     talon.setControl(
-        positionTorqueCurrentRequest
+        posCon
             .withPosition(
                 Units.radiansToRotations(positionRad / ElevatorConstants.kElevatorDrumRadius))
-            .withFeedForward(feedforward)
             .withSlot(0));
   }
 
