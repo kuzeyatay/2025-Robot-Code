@@ -15,6 +15,7 @@ import edu.wpi.first.wpilibj.Notifier;
 import edu.wpi.first.wpilibj.Timer;
 import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 import edu.wpi.first.wpilibj.util.Color;
+import frc.robot.util.LoggedTracer;
 import frc.robot.util.VirtualSubsystem;
 import java.util.List;
 import java.util.Optional;

@@ -112,10 +112,10 @@ public class DriveConstants {
   public static final Distance bumperWidthY = Meters.of(Units.inchesToMeters(36)); // FIXME
 
   // Zeroed rotation values for each swerve module in radians
-  public static final Rotation2d frontLeftZeroRotation = new Rotation2d(-0.053);
-  public static final Rotation2d frontRightZeroRotation = new Rotation2d(0.170);
-  public static final Rotation2d backLeftZeroRotation = new Rotation2d(0.067);
-  public static final Rotation2d backRightZeroRotation = new Rotation2d(0.163);
+  public static final Rotation2d frontLeftZeroRotation = new Rotation2d(-0.327);
+  public static final Rotation2d frontRightZeroRotation = new Rotation2d(1.065);
+  public static final Rotation2d backLeftZeroRotation = new Rotation2d(0.459);
+  public static final Rotation2d backRightZeroRotation = new Rotation2d(1.068);
 
   // CAN IDs for the Pigeon gyro sensor
   public static final int pigeonCanId = 20;

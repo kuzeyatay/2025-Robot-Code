@@ -1,5 +1,6 @@
 package frc.robot.subsystems.drive;
 
+import static edu.wpi.first.units.Units.Radians;
 import static frc.robot.subsystems.drive.DriveConstants.*;
 import static frc.robot.util.SparkUtil.*;
 
@@ -193,7 +194,12 @@ public class ModuleIOSpark implements ModuleIO {
         () ->
             turnSpark.configure(
                 turnConfig, ResetMode.kResetSafeParameters, PersistMode.kPersistParameters));
-    tryUntilOk(turnSpark, 5, () -> turnEncoder.setPosition(0));
+    tryUntilOk(
+        turnSpark,
+        5,
+        () ->
+            turnEncoder.setPosition(
+                turnAbsoluteEncoder.getAbsolutePosition().getValue().in(Radians)));
   }
 
   @Override
@@ -225,7 +231,7 @@ public class ModuleIOSpark implements ModuleIO {
 
     // Update the absolute position
     inputs.turnAbsolutePosition =
-        new Rotation2d(turnAbsoluteEncoder.getPosition().getValueAsDouble());
+        new Rotation2d(turnAbsoluteEncoder.getPosition().getValue().in(Radians));
 
     // Update odometry inputs
     inputs.odometryTimestamps = timestampQueue.stream().mapToDouble(Double::doubleValue).toArray();
