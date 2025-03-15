@@ -162,14 +162,14 @@ public class Elevator extends SubsystemBase {
     STOW(() -> 0, () -> 0),
     // Define ANGLE1 goal with a tunable setpoint of 45 degrees
     INTAKE(
-        new LoggedTunableNumber("Top Elevator Flywheel/Intake", -2000),
-        new LoggedTunableNumber("Bottom Elevator Flywheel/Intake", 2000)),
+        new LoggedTunableNumber("Top Elevator Flywheel/Intake", -3000),
+        new LoggedTunableNumber("Bottom Elevator Flywheel/Intake", 3000)),
     NET(
         new LoggedTunableNumber("Top Elevator Flywheel/Eject", 3000),
         new LoggedTunableNumber("Bottom Elevator Flywheel/Eject", -3000)),
     EJECT(
-        new LoggedTunableNumber("Top Elevator Flywheel/Eject", 3000),
-        new LoggedTunableNumber("Bottom Elevator Flywheel/Eject", -3000));
+        new LoggedTunableNumber("Top Elevator Flywheel/Eject", 5000),
+        new LoggedTunableNumber("Bottom Elevator Flywheel/Eject", -5000));
 
     // Supplier to provide the arm setpoint in degrees
     private final DoubleSupplier topFlywheelRPM;

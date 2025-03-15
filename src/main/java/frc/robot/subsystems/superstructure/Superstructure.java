@@ -13,12 +13,14 @@ import frc.robot.util.EqualsUtil;
 import frc.robot.util.TimeDelayedBoolean;
 import java.util.function.BooleanSupplier;
 import java.util.function.Supplier;
+import lombok.Getter;
 import lombok.Setter;
 import org.littletonrobotics.junction.AutoLogOutput;
 import org.littletonrobotics.junction.Logger;
 
 public class Superstructure extends SubsystemBase {
   private final Elevator elevator;
+  public final Timer mytimer = new Timer();
   private final AlgeManipulator algeManipulator;
   private final CoralWrist coralWrist;
   private TimeDelayedBoolean mNotHasGamePiece = new TimeDelayedBoolean();
@@ -34,6 +36,8 @@ public class Superstructure extends SubsystemBase {
 
   @AutoLogOutput(key = "Superstructure/HasCoral")
   private boolean hasCoral = false;
+
+  @Getter @Setter boolean isProcessing = false;
 
   @Setter private BooleanSupplier disabledOverride = () -> false;
   private final Alert driverDisableAlert =
@@ -62,8 +66,8 @@ public class Superstructure extends SubsystemBase {
   @Override
   public void periodic() {
 
-    Leds.getInstance().hpAttentionLeftAlert = getHasLeftCoral();
-    Leds.getInstance().hpAttentionRightAlert = getHasRightCoral();
+    Leds.getInstance().hpAttentionAlert = getHasRightCoral() || getHasLeftCoral();
+
     Leds.getInstance().hasAlge = getHasAlge();
 
     hasCoral = getHasLeftCoral() || getHasRightCoral();
@@ -87,12 +91,17 @@ public class Superstructure extends SubsystemBase {
       }
       case L3_CORAL_EJECT, L4_CORAL_EJECT -> {
         if (hasCoral) {
+          // Reset the timer if we don't have the game piece.
+
           runElevator(state.getElevatorGoal());
           runIf(() -> elevator.atGoal(), () -> runCoralWrist(state.getCoralWristGoal()));
+
           runIf(
               () -> coralWrist.atGoal() && elevator.atGoal(),
               () -> {
-                runCoralWristFlywheel(state.getCoralWristFlywheelGoal());
+                /* stowStartTime = -1; */
+                /* runCoralWristFlywheel(CoralWrist.flywheelGoal.SLOW_INTAKE); */
+                /* if (stowStartTime < 0.1) runCoralWristFlywheel(state.getCoralWristFlywheelGoal()); */
               });
 
         } else {
@@ -131,6 +140,23 @@ public class Superstructure extends SubsystemBase {
           runIf(
               () -> coralWrist.atGoal(),
               () -> {
+                /* runCoralWristFlywheel(state.getCoralWristFlywheelGoal()); */
+              });
+
+        } else {
+          runCoralWristFlywheel(CoralWrist.flywheelGoal.STOW);
+          runIf(
+              () -> EqualsUtil.epsilonEquals(coralWrist.getFlywheelVelocityRPM(), 0, 100),
+              () -> runCoralWrist(CoralWrist.Goal.STOW));
+        }
+      }
+      case L2_CORAL_EJECT_AUTO -> {
+        if (hasCoral) {
+          runElevator(state.getElevatorGoal());
+          runIf(() -> elevator.isHomed(), () -> runCoralWrist(state.getCoralWristGoal()));
+          runIf(
+              () -> coralWrist.atGoal(),
+              () -> {
                 runCoralWristFlywheel(state.getCoralWristFlywheelGoal());
               });
 
@@ -141,7 +167,6 @@ public class Superstructure extends SubsystemBase {
               () -> runCoralWrist(CoralWrist.Goal.STOW));
         }
       }
-
       case LIMBO_1_ALGE_INTAKE, LIMBO_2_ALGE_INTAKE -> {
         runCoralWrist(state.getCoralWristGoal());
         runElevator(state.getElevatorGoal());
@@ -152,9 +177,10 @@ public class Superstructure extends SubsystemBase {
 
         runIf(
             () -> algeManipulator.atGoal(),
-            () ->
-                runAlgeManipulatorFlywheel(
-                    state.getAlgeManipulatorFlywheelGoal())); // Sends the AlgeMan to LIMBO 1
+            () -> {
+              runAlgeManipulatorFlywheel(state.getAlgeManipulatorFlywheelGoal());
+              runElevatorFlywheel(state.getElevatorFlywheelGoal());
+            }); // Sends the AlgeMan to LIMBO 1
       }
         /* case LIMBO_1_ALGE_INTAKE, LIMBO_2_ALGE_INTAKE -> {
           if (hasAlge) {
@@ -179,22 +205,27 @@ public class Superstructure extends SubsystemBase {
         } */
       case CORAL_INTAKE -> {
         if (!hasCoral) {
+
           runAlgeManipulator(state.getAlgeManipulatorGoal());
           runCoralWrist(state.getCoralWristGoal());
           runIf(() -> coralWrist.atGoal(), () -> runElevator(state.getElevatorGoal()));
           runIf(
               () -> elevator.atGoal(),
               () -> runCoralWristFlywheel(state.getCoralWristFlywheelGoal()));
-
+          /*
           runIf(
-              () -> hasCoral,
+              () -> getHasLeftCoralDelayed() || getHasRightCoralDelayed(),
               () -> {
                 coralWrist.runFlywheelVelocity(0);
                 hasCoral = false;
-              });
+              }); */
+          mytimer.reset();
+        } else {
 
-        } else if (mNotHasGamePiece.update(true, 0.5)) {
-          coralWrist.runFlywheelVelocity(0);
+          mytimer.start();
+          if (mytimer.get() > 0.3) {
+            coralWrist.runFlywheelVelocity(0);
+          }
         }
         // Timer.delay(1);
 
@@ -203,8 +234,6 @@ public class Superstructure extends SubsystemBase {
 
       case GROUND_ALGE_INTAKE -> {
         if (!hasAlge) {
-          // Reset the timer if we don't have the game piece.
-          stowStartTime = -1;
 
           // Run the normal intake routines.
           runCoralWrist(state.getCoralWristGoal());
@@ -216,18 +245,18 @@ public class Superstructure extends SubsystemBase {
                 runAlgeManipulatorFlywheel(state.getAlgeManipulatorFlywheelGoal());
                 runElevatorFlywheel(state.getElevatorFlywheelGoal());
               });
+
+          mytimer.reset();
         } else {
-          // When hasAlge becomes true, start the timer if it isn't already started.
-          if (stowStartTime < 0) {
-            stowStartTime = Timer.getFPGATimestamp();
-          }
+
+          /*  mytimer.start();
           // Check if 0.5 seconds have passed.
-          if (Timer.getFPGATimestamp() - stowStartTime >= 0.55) {
+          if (mytimer.get() > 0.075) {
             runAlgeManipulator(AlgeManipulator.Goal.STOW);
             algeManipulator.runFlywheelVelocity(0);
             runElevatorFlywheel(Elevator.flywheelGoal.STOW);
             runAlgeManipulatorFlywheel(AlgeManipulator.flywheelGoal.STOW);
-          }
+          } */
         }
       }
 
@@ -255,24 +284,19 @@ public class Superstructure extends SubsystemBase {
             });
       }
       case CORAL_STOW -> {
-        if (hasCoral) {
-          runCoralWristFlywheel(CoralWrist.flywheelGoal.STOW);
-          runElevator(state.getElevatorGoal());
-          runIf(
-              () -> elevator.isHomed(),
-              () -> {
-                runCoralWrist(state.getCoralWristGoal());
-              });
-
-        } else {
-
-        }
+        runCoralWristFlywheel(CoralWrist.flywheelGoal.STOW);
+        runElevator(state.getElevatorGoal());
+        runIf(
+            () -> elevator.isHomed(),
+            () -> {
+              runCoralWrist(state.getCoralWristGoal());
+            });
       }
       case SYSTEM_STOW -> {
         runAlgeManipulatorFlywheel(AlgeManipulator.flywheelGoal.STOW);
         runElevatorFlywheel(Elevator.flywheelGoal.STOW);
         runCoralWristFlywheel(CoralWrist.flywheelGoal.STOW);
-
+        isProcessing = false;
         runCoralWrist(state.getCoralWristGoal());
 
         runIf(() -> coralWrist.atGoal(), () -> runAlgeManipulator(state.getAlgeManipulatorGoal()));
@@ -283,7 +307,7 @@ public class Superstructure extends SubsystemBase {
             });
       }
       case PROCESSOR -> {
-        if (hasAlge) {
+        if (isProcessing) {
           runCoralWrist(state.getCoralWristGoal());
           runIf(
               () -> coralWrist.atGoal(), () -> runAlgeManipulator(state.getAlgeManipulatorGoal()));
@@ -362,7 +386,7 @@ public class Superstructure extends SubsystemBase {
   }
 
   private boolean getHasAlge() {
-    return algeManipulator.getLaserDistance() < 80;
+    return algeManipulator.getLaserDistance() < 20;
   }
 
   private boolean getHasLeftCoral() {
@@ -371,6 +395,18 @@ public class Superstructure extends SubsystemBase {
 
   private boolean getHasRightCoral() {
     return coralWrist.getRightLaserDistance() < 60;
+  }
+
+  private boolean getHasAlgeDelayed() {
+    return mNotHasGamePiece.update(algeManipulator.getLaserDistance() < 80, 5);
+  }
+
+  private boolean getHasLeftCoralDelayed() {
+    return mNotHasGamePiece.update(coralWrist.getLeftLaserDistance() < 60, 7); // was 5
+  }
+
+  private boolean getHasRightCoralDelayed() {
+    return mNotHasGamePiece.update(coralWrist.getRightLaserDistance() < 60, 7); // was 5
   }
 
   // FUCK YES

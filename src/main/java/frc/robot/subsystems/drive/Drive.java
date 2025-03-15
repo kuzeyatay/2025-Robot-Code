@@ -363,6 +363,10 @@ public class Drive extends SubsystemBase implements Vision.VisionConsumer {
     return getPose().getRotation();
   }
 
+  // public void setGyro(double angle){
+
+  // }
+
   /** Resets the current odometry pose. */
   public void resetOdometry(Pose2d pose) {
     // Reset the pose estimator with the current gyro rotation, module positions, and the new pose

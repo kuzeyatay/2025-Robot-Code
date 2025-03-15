@@ -4,10 +4,12 @@
   "holonomicMode": true,
   "pathFolders": [
     "Auto1",
+    "1c1a",
     "Nil K"
   ],
   "autoFolders": [
     "Auto1",
+    "1c1a",
     "Nil K"
   ],
   "defaultMaxVel": 4.5,

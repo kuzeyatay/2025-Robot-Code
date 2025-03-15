@@ -72,16 +72,16 @@ import org.ironmaple.simulation.drivesims.configs.SwerveModuleSimulationConfig;
 // Define the DriveConstants class to hold all constants related to the drive subsystem
 public class DriveConstants {
   // Maximum linear speed in meters per second
-  public static final double maxSpeedMetersPerSec = 4.8; // max to 4.8
+  public static final double maxSpeedMetersPerSec = 4; // max to 4.8
 
   // Maximum linear acceleration in meters per second squared
-  public static final double maxAccelerationMetersPerSecSq = Units.feetToMeters(90.0); // FIXME
+  public static final double maxAccelerationMetersPerSecSq = Units.feetToMeters(70.0); // FIXME
 
   // Maximum angular speed in radians per second
-  public static final double maxAngularSpeedRadiansPerSec = 10.27;
+  public static final double maxAngularSpeedRadiansPerSec = 6.5;
 
   // Maximum angular acceleration in radians per second squared
-  public static final double maxAngularAccelerationRadPerSecSq = 5.0;
+  public static final double maxAngularAccelerationRadPerSecSq = 4.0;
 
   // Odometry update frequency in Hz
   public static final double odometryFrequency =
@@ -112,10 +112,10 @@ public class DriveConstants {
   public static final Distance bumperWidthY = Meters.of(Units.inchesToMeters(36)); // FIXME
 
   // Zeroed rotation values for each swerve module in radians
-  public static final Rotation2d frontLeftZeroRotation = new Rotation2d(-0.327);
-  public static final Rotation2d frontRightZeroRotation = new Rotation2d(1.065);
-  public static final Rotation2d backLeftZeroRotation = new Rotation2d(0.459);
-  public static final Rotation2d backRightZeroRotation = new Rotation2d(1.068);
+  public static final Rotation2d frontLeftZeroRotation = new Rotation2d(0);
+  public static final Rotation2d frontRightZeroRotation = new Rotation2d(0);
+  public static final Rotation2d backLeftZeroRotation = new Rotation2d(0.0);
+  public static final Rotation2d backRightZeroRotation = new Rotation2d(0.0);
 
   // CAN IDs for the Pigeon gyro sensor
   public static final int pigeonCanId = 20;
@@ -132,14 +132,8 @@ public class DriveConstants {
   public static final int frontRightTurnCanId = 2;
   public static final int backRightTurnCanId = 8;
 
-  // CAN IDs for CANcoders
-  public static final int CANcoderModule0 = 11;
-  public static final int CANcoderModule1 = 10;
-  public static final int CANcoderModule2 = 9;
-  public static final int CANcoderModule3 = 12;
-
   // Drive motor current limit in Amperes
-  public static final int driveMotorCurrentLimit = 50;
+  public static final int driveMotorCurrentLimit = 45;
 
   // Wheel radius in meters
   public static final double wheelRadiusMeters =

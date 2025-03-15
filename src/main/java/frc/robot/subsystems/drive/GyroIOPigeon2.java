@@ -66,7 +66,7 @@ public class GyroIOPigeon2 implements GyroIO {
     inputs.connected = BaseStatusSignal.refreshAll(yaw, yawVelocity).equals(StatusCode.OK);
 
     // Set the current yaw position by converting the Pigeon2 yaw angle from degrees to radians
-    inputs.yawPosition = Rotation2d.fromDegrees(yaw.getValueAsDouble());
+    inputs.yawPosition = Rotation2d.fromDegrees(yaw.getValueAsDouble() + 90);
 
     // Set the current yaw velocity by converting the Pigeon2 yaw angular velocity from degrees/sec
     // to radians/sec

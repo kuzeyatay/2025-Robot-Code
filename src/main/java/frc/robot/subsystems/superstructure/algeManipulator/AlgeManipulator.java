@@ -120,10 +120,10 @@ public class AlgeManipulator extends SubsystemBase {
   public enum Goal {
     // Define the STOW goal with an angle of 0 degrees
     STOW(() -> -3),
-    BACKWARDS_STOW(() -> -8),
+    BACKWARDS_STOW(() -> 5),
     // Define ANGLE1 goal with a tunable setpoint of 45 degrees
-    GROUND_INTAKE(new LoggedTunableNumber("Alge Manipulator/Ground intake for alge", 90)),
-    LIMBO_1(new LoggedTunableNumber("Alge Manipulator/L2_L3", 50)),
+    GROUND_INTAKE(new LoggedTunableNumber("Alge Manipulator/Ground intake for alge", 105)),
+    LIMBO_1(new LoggedTunableNumber("Alge Manipulator/L2_L3", 45)),
     LIMBO_2(new LoggedTunableNumber("Alge Manipulator/L3_L4", 50.0)),
     PROCESSOR(new LoggedTunableNumber("Alge Manipulator/Processor", 65)),
     NET(new LoggedTunableNumber("Alge Manipulator/Net", 48)),
@@ -146,8 +146,10 @@ public class AlgeManipulator extends SubsystemBase {
     // Define the STOW goal with an angle of 0 degrees
     STOW(() -> 0),
     // Define ANGLE1 goal with a tunable setpoint of 45 degrees
-    INTAKE(new LoggedTunableNumber("Alge Manipulator Flywheels/Ground intake for alge", -2000)),
-    PROCESSOR(new LoggedTunableNumber("Alge Manipulator Flywheels/Processor", 2000)),
+    INTAKE(
+        new LoggedTunableNumber(
+            "Alge Manipulator Flywheels/Ground intake for alge", -4500)), // 2000'di
+    PROCESSOR(new LoggedTunableNumber("Alge Manipulator Flywheels/Processor", 4000)),
     NET(new LoggedTunableNumber("Alge Manipulator Flywheels/Net", -6000)),
     EJECT(new LoggedTunableNumber("Alge Manipulator Flywheels/Eject", 3000)),
     SKYFALL(

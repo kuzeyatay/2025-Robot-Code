@@ -135,11 +135,11 @@ public class CoralWristIOKrakenFOC implements CoralWristIO {
     // Retrieve the MotionMagic configuration from the TalonFX configuration
     var motionMagicConfigs = config.MotionMagic;
     // Set the cruise velocity for Motion Magic to 80 rotations per second
-    motionMagicConfigs.MotionMagicCruiseVelocity = 320; // Target cruise velocity of 80 rps
+    motionMagicConfigs.MotionMagicCruiseVelocity = 290; // Target cruise velocity of 80 rps
     // Set the acceleration for Motion Magic to 160 rotations per second squared (0.5 seconds to
     // reach target)
     motionMagicConfigs.MotionMagicCruiseVelocity = 0; // Unlimited cruise velocity
-    motionMagicConfigs.MotionMagicExpo_kV = 0.42; // kV is around 0.12 V/rps
+    motionMagicConfigs.MotionMagicExpo_kV = 0.38; // kV is around 0.12 V/rps
     motionMagicConfigs.MotionMagicExpo_kA = 0.1; // Use a slower kA of 0.1 V/(rps/s)
   }
 

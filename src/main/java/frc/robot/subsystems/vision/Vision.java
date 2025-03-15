@@ -28,6 +28,7 @@ import edu.wpi.first.wpilibj2.command.SubsystemBase;
 import frc.robot.subsystems.vision.VisionIO.PoseObservationType;
 import java.util.LinkedList;
 import java.util.List;
+import org.littletonrobotics.junction.AutoLogOutput;
 import org.littletonrobotics.junction.Logger;
 
 public class Vision extends SubsystemBase {
@@ -60,8 +61,14 @@ public class Vision extends SubsystemBase {
    *
    * @param cameraIndex The index of the camera to use.
    */
+  @AutoLogOutput(key = "Visione/target x")
   public Rotation2d getTargetX(int cameraIndex) {
     return inputs[cameraIndex].latestTargetObservation.tx();
+  }
+
+  @AutoLogOutput(key = "Visione/target y")
+  public Rotation2d getTargetY(int cameraIndex) {
+    return inputs[cameraIndex].latestTargetObservation.ty();
   }
 
   @Override
@@ -98,6 +105,7 @@ public class Vision extends SubsystemBase {
 
       // Loop over pose observations
       for (var observation : inputs[cameraIndex].poseObservations) {
+
         // Check whether to reject pose
         boolean rejectPose =
             observation.tagCount() == 0 // Must have at least one tag
@@ -184,5 +192,31 @@ public class Vision extends SubsystemBase {
         Pose2d visionRobotPoseMeters,
         double timestampSeconds,
         Matrix<N3, N1> visionMeasurementStdDevs);
+  }
+
+  /**
+   * Returns the Pose2d of the first detected AprilTag with ID 7, 8, or 9. If no such tag is
+   * detected, returns null.
+   *
+   * @return the Pose2d of the selected tag, or null if none found.
+   */
+  public Pose2d getSelectedTagPose() {
+    // Loop over each camera input
+    for (int cameraIndex = 0; cameraIndex < io.length; cameraIndex++) {
+      // Loop over each detected tag ID for this camera
+      for (int tagId : inputs[cameraIndex].tagIds) {
+        if (tagId == 7 || tagId == 8 || tagId == 9) {
+          // Retrieve the pose from the aprilTagLayout
+          var tagPoseOptional = aprilTagLayout.getTagPose(tagId);
+          if (tagPoseOptional.isPresent()) {
+            // Convert the Pose3d to a Pose2d by dropping the Z component and rotation about X/Y
+            // axes.
+            return tagPoseOptional.get().toPose2d();
+          }
+        }
+      }
+    }
+    // No tag with ID 7, 8, or 9 was detected.
+    return new Pose2d();
   }
 }

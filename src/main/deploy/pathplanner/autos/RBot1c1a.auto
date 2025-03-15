@@ -1,0 +1,61 @@
+{
+  "version": "2025.0",
+  "command": {
+    "type": "sequential",
+    "data": {
+      "commands": [
+        {
+          "type": "path",
+          "data": {
+            "pathName": "RBot2BR"
+          }
+        },
+        {
+          "type": "named",
+          "data": {
+            "name": "coralL3Eject"
+          }
+        },
+        {
+          "type": "wait",
+          "data": {
+            "waitTime": 7.0
+          }
+        },
+        {
+          "type": "path",
+          "data": {
+            "pathName": "STAY BACK"
+          }
+        },
+        {
+          "type": "named",
+          "data": {
+            "name": "algeIntake"
+          }
+        },
+        {
+          "type": "path",
+          "data": {
+            "pathName": "IMISSEDU"
+          }
+        },
+        {
+          "type": "wait",
+          "data": {
+            "waitTime": 7.0
+          }
+        },
+        {
+          "type": "path",
+          "data": {
+            "pathName": "STAY BACK"
+          }
+        }
+      ]
+    }
+  },
+  "resetOdom": true,
+  "folder": null,
+  "choreoAuto": false
+}

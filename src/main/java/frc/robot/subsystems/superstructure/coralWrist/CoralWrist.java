@@ -49,7 +49,7 @@ public class CoralWrist extends SubsystemBase {
   private static final LoggedTunableNumber kG =
       new LoggedTunableNumber("Coral Wrist/Gains/kG", gains.ffkG());
   private static final LoggedTunableNumber homingVolts =
-      new LoggedTunableNumber("Coral Wristr/HomingVolts", -1.0);
+      new LoggedTunableNumber("Coral Wristr/HomingVolts", -2.0);
   private static final LoggedTunableNumber homingTimeSecs =
       new LoggedTunableNumber("Coral Wrist/HomingTimeSecs", 0.2);
   private static final LoggedTunableNumber homingVelocityThresh =
@@ -118,13 +118,13 @@ public class CoralWrist extends SubsystemBase {
   public enum Goal {
     // Define the STOW goal with an angle of 0 degrees
     STOW(() -> 0),
-    CORAL_STOW(() -> 159),
+    CORAL_STOW(() -> 150),
     // Define ANGLE1 goal with a tunable setpoint of 45 degrees
     L1(new LoggedTunableNumber("Coral Wrist/L1", 138)),
-    L2(new LoggedTunableNumber("Coral Wrist/L2", 105)),
-    L3(new LoggedTunableNumber("Coral Wrist/L3", 135)),
-    L4(new LoggedTunableNumber("Coral Wrist/L4", 135)),
-    CHUTE(new LoggedTunableNumber("Coral Wrist/Chute", 41.0)),
+    L2(new LoggedTunableNumber("Coral Wrist/L2", 150)),
+    L3(new LoggedTunableNumber("Coral Wrist/L3", 130)),
+    L4(new LoggedTunableNumber("Coral Wrist/L4", 113)),
+    CHUTE(new LoggedTunableNumber("Coral Wrist/Chute", 35.0)),
     EJECT(new LoggedTunableNumber("Coral Wrist/Eject", 45.0));
 
     // Define ANGLE2 goal with a tunable setpoint of 90 degrees
@@ -144,9 +144,10 @@ public class CoralWrist extends SubsystemBase {
     // Define the STOW goal with an angle of 0 degrees
     STOW(() -> 0),
     // Define ANGLE1 goal with a tunable setpoint of 45 degrees
-    NET(new LoggedTunableNumber("Coral Wrist Flywheels/Net", -4000)),
-    EJECT(new LoggedTunableNumber("Coral Wrist Flywheels/Eject", 6000)),
-    INTAKE(new LoggedTunableNumber("Coral Wrist Flywheels/Intake", 6000));
+    NET(new LoggedTunableNumber("Coral Wrist Flywheels/Net", 4000)),
+    EJECT(new LoggedTunableNumber("Coral Wrist Flywheels/Eject", -7000)),
+    INTAKE(new LoggedTunableNumber("Coral Wrist Flywheels/Intake", -7000)),
+    SLOW_INTAKE(new LoggedTunableNumber("Coral Wrist Flywheels/Intake", -7000));
 
     // Supplier to provide the arm setpoint in degrees
     private final DoubleSupplier flywheelRPM;

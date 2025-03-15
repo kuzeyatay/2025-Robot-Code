@@ -66,6 +66,15 @@ public enum SuperstructureState {
           .elevatorFlywheelGoal(Elevator.flywheelGoal.INTAKE)
           .coralWristFlywheelGoal(CoralWrist.flywheelGoal.STOW)
           .build()),
+  L2_CORAL_EJECT_AUTO(
+      SuperstructureStateData.builder()
+          .algeManipulatorGoal(AlgeManipulator.Goal.STOW)
+          .elevatorGoal(Elevator.Goal.L2)
+          .coralWristGoal(CoralWrist.Goal.L2)
+          .algeManipulatorFlywheelGoal(AlgeManipulator.flywheelGoal.STOW)
+          .elevatorFlywheelGoal(Elevator.flywheelGoal.STOW)
+          .coralWristFlywheelGoal(CoralWrist.flywheelGoal.EJECT)
+          .build()),
   L2_CORAL_EJECT(
       SuperstructureStateData.builder()
           .algeManipulatorGoal(AlgeManipulator.Goal.STOW)

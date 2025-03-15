@@ -37,6 +37,7 @@ public class Leds extends VirtualSubsystem {
   public boolean endgameAlert = false;
   public boolean autoScoringReef = false;
   public boolean autoScoring = false;
+  public boolean off = false;
   public boolean superstructureCoast = false;
   public boolean superstructureEstopped = false;
   public boolean lowBatteryAlert = false;
@@ -188,7 +189,9 @@ public class Leds extends VirtualSubsystem {
             waveDisabledCycleLength,
             waveDisabledDuration);
       }
-
+      if (off) {
+        solid(fullSection, Color.kBlack);
+      }
       // Vision disconnected alert
       if (visionDisconnected) {
         strobe(bottomQuartSection, Color.kRed, Color.kBlack, strobeDuration);
@@ -219,24 +222,29 @@ public class Leds extends VirtualSubsystem {
         strobe(fullSection, Color.kGold, Color.kDarkBlue, strobeDuration);
       }
       // Climbing alert
+      if (hpAttentionRightAlert) {
+        wave(fullSection, Color.kWhite, Color.kDarkBlue, 15, 2);
+      }
+
+      // Climbing alert
       if (hpAttentionLeftAlert) {
-        strobe(fullSection, Color.kGreen, Color.kWhite, 0.5);
+        wave(fullSection, Color.kDarkMagenta, Color.kWhite, 15, 2);
       }
       // Climbing alert
-      if (hpAttentionRightAlert) {
-        strobe(fullSection, Color.kWhite, Color.kGreen, 0.5);
+      if (hpAttentionAlert) {
+        solid(fullSection, Color.kGreen);
       }
 
       // Coral grab alert
       if (coralGrabbed) {
         solid(fullSection, Color.kLime);
       }
-
-      // Human player alert
-      if (hpAttentionAlert) {
-        strobe(fullSection, Color.kWhite, Color.kBlack, strobeDuration);
-      }
-
+      /*
+           // Human player alert
+           if (hpAttentionAlert) {
+             strobe(fullSection, Color.kWhite, Color.kBlack, strobeDuration);
+           }
+      */
       // Endgame alert
       if (endgameAlert) {
         strobe(fullSection, Color.kRed, Color.kGold, strobeDuration);
